@@ -206,36 +206,91 @@ jobs:
       - name: Run K3s and master in it
         run: tests/run-master-in-k3s.sh local/freeipa-server:${{ matrix.os }} freeipa-server-${{ matrix.os }}.tar
 
-  push-after-success:
-    name: Push images to Docker Hub
-    runs-on: ubuntu-20.04
+  push-after-success-precondition:
+    name: Check pipeline settings
     needs: [ test-docker, test-podman, test-rootless-podman, test-upgrade, test-k3s ]
-    if: github.event_name != 'pull_request' && github.repository == 'freeipa/freeipa-container' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-20.04
+    env:
+      DOCKER_TARGET_LIST: "${{ secrets.DOCKER_TARGET_LIST }}"
+      DOCKER_CREDENTIALS_FILE: "${{ secrets.DOCKER_CREDENTIALS_FILE }}"
     steps:
-      - name: Log in to Docker Hub
+      - name: Check secrets
+        id: check
+        run: |
+          [ -e "${HOME}/.docker" ] || mkdir -p "${HOME}/.docker"
+          cat > "${HOME}/.docker/config.json" <<EOF
+          ${DOCKER_CREDENTIALS_FILE}
+          EOF
+          [ "${DOCKER_TARGET_LIST}" == "" ] && echo "Target list is empty" && echo "::set-output name=are-valid-credentials::false" && exit 0
+          IFS=":" read -a TARGET_LIST <<< "${DOCKER_TARGET_LIST}"
+          for base_name in "${TARGET_LIST[@]}"; do
+            docker login ${base_name%%/*} < /dev/null || {
+              echo "Can not log in to '${base_name%%/*}'' registry"
+              echo "::set-output name=are-valid-credentials::false"
+              exit 0
+            }
+          done
+          echo "::set-output name=are-valid-credentials::true"
+    outputs:
+      are-valid-credentials: ${{ steps.check.outputs.are-valid-credentials }}
+
+  push-after-success:
+    name: Push images to Registry
+    runs-on: ubuntu-20.04
+    needs: [ push-after-success-precondition ]
+    if: needs.push-after-success-precondition.outputs.are-valid-credentials == 'true' && github.event_name != 'pull_request' && ( ( github.repository == 'freeipa/freeipa-container' && github.ref == 'refs/heads/master' ) || github.repository != 'freeipa/freeipa-container' )
+    env:
+      DOCKER_TARGET_LIST: "${{ secrets.DOCKER_TARGET_LIST }}"
+    steps:
+      - name: Prepare credentials
         env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: echo "$DOCKER_PASSWORD" | skopeo login --authfile=auth.json -u "$DOCKER_USERNAME" --password-stdin docker.io
+          DOCKER_CREDENTIALS_FILE: "${{ secrets.DOCKER_CREDENTIALS_FILE }}"
+        run: |
+          cat > "auth.json" << EOF
+          ${DOCKER_CREDENTIALS_FILE}
+          EOF
       - uses: actions/download-artifact@v2
         with:
           name: freeipa-server-fedora-33
-      - name: Push Fedora 33 image to Docker Hub
-        run: skopeo copy --authfile=auth.json docker-archive:freeipa-server-fedora-33.tar.gz docker://docker.io/freeipa/freeipa-server:fedora-33
-      - name: Push Fedora 33 image tagged with FreeIPA version to Docker Hub
-        run: skopeo copy --authfile=auth.json docker-archive:freeipa-server-fedora-33.tar.gz docker://docker.io/freeipa/freeipa-server:fedora-33-$( cat freeipa-server-fedora-33.version )
+      - name: Push Fedora 33 image to the registry
+        run: |
+          IFS=":" read -a TARGET_LIST <<< "${DOCKER_TARGET_LIST}"
+          for base_name in "${TARGET_LIST[@]}"; do
+            skopeo copy --authfile=auth.json docker-archive:freeipa-server-fedora-33.tar.gz docker://${base_name}:fedora-33
+          done
+      - name: Push Fedora 33 image tagged with FreeIPA version to the registry
+        run: |
+          IFS=":" read -a TARGET_LIST <<< "${DOCKER_TARGET_LIST}"
+          for base_name in "${TARGET_LIST[@]}"; do
+            skopeo copy --authfile=auth.json docker-archive:freeipa-server-fedora-33.tar.gz docker://${base_name}:fedora-33-$( cat freeipa-server-fedora-33.version )
+          done
       - uses: actions/download-artifact@v2
         with:
           name: freeipa-server-fedora-32
-      - name: Push Fedora 32 image to Docker Hub
-        run: skopeo copy --authfile=auth.json docker-archive:freeipa-server-fedora-32.tar.gz docker://docker.io/freeipa/freeipa-server:fedora-32
-      - name: Push Fedora 32 image tagged with FreeIPA version to Docker Hub
-        run: skopeo copy --authfile=auth.json docker-archive:freeipa-server-fedora-32.tar.gz docker://docker.io/freeipa/freeipa-server:fedora-32-$( cat freeipa-server-fedora-32.version )
+      - name: Push Fedora 32 image to the registry
+        run: |
+          IFS=":" read -a TARGET_LIST <<< "${DOCKER_TARGET_LIST}"
+          for base_name in "${TARGET_LIST[@]}"; do
+            skopeo copy --authfile=auth.json docker-archive:freeipa-server-fedora-32.tar.gz docker://${base_name}:fedora-32
+          done
+      - name: Push Fedora 32 image tagged with FreeIPA version to the registry
+        run: |
+          IFS=":" read -a TARGET_LIST <<< "${DOCKER_TARGET_LIST}"
+          for base_name in "${TARGET_LIST[@]}"; do
+            skopeo copy --authfile=auth.json docker-archive:freeipa-server-fedora-32.tar.gz docker://${base_name}:fedora-32-$( cat freeipa-server-fedora-32.version )
+          done
       - uses: actions/download-artifact@v2
         with:
           name: freeipa-server-centos-7
-      - name: Push CentOS 7 image to Docker Hub
-        run: skopeo copy --authfile=auth.json docker-archive:freeipa-server-centos-7.tar.gz docker://docker.io/freeipa/freeipa-server:centos-7
-      - name: Push CentOS 7 image tagged with FreeIPA version to Docker Hub
-        run: skopeo copy --authfile=auth.json docker-archive:freeipa-server-centos-7.tar.gz docker://docker.io/freeipa/freeipa-server:centos-7-$( cat freeipa-server-centos-7.version )
-
+      - name: Push CentOS 7 image to the registry
+        run: |
+          IFS=":" read -a TARGET_LIST <<< "${DOCKER_TARGET_LIST}"
+          for base_name in "${TARGET_LIST[@]}"; do
+            skopeo copy --authfile=auth.json docker-archive:freeipa-server-centos-7.tar.gz docker://${base_name}:centos-7
+          done
+      - name: Push CentOS 7 image tagged with FreeIPA version to the registry
+        run: |
+          IFS=":" read -a TARGET_LIST <<< "${DOCKER_TARGET_LIST}"
+          for base_name in "${TARGET_LIST[@]}"; do
+            skopeo copy --authfile=auth.json docker-archive:freeipa-server-centos-7.tar.gz docker://${base_name}:centos-7-$( cat freeipa-server-centos-7.version )
+          done
