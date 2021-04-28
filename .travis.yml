@@ -3,7 +3,8 @@ os: linux
 dist: focal
 
 virt: vm
-arch: amd64
+arch: arm64-graviton2
+group: edge
 
 services:
 - docker
