@@ -19,48 +19,15 @@ before_script:
 - perl -e 'print map "$_=$ENV{$_}".chr(10), sort keys %ENV'
 
 script:
-- $docker load -i local-freeipa-server-$dockerfile.tar
-- $docker run --rm --entrypoint rpm local/freeipa-server:$dockerfile -qa | sort
-- tests/run-master-and-replica.sh local/freeipa-server:$dockerfile
-
-after_failure:
-- $docker ps -aq | while read i ; do $docker rm -f $i ; done
-- tests/run-partial-tests.sh Dockerfile.$dockerfile
+- $docker build -t systemd -f Dockerfile.$dockerfile .
+- ( sleep 10 ; $docker rm -f systemd ) & $docker run --name systemd -ti --rm systemd /usr/sbin/init
 
 stages:
-- build
 - test
 
 jobs:
   include:
-    - &build-stage
-      stage: build
-      env: dockerfile=fedora-34
-      install: export docker=${docker:-docker}
-      script: $docker build -t local/freeipa-server:$dockerfile -f Dockerfile.$dockerfile . && $docker save --output local-freeipa-server-$dockerfile.tar local/freeipa-server:$dockerfile
-      after_failure: skip
-      workspaces:
-        create:
-          name: fedora-34
-          paths:
-            - local-freeipa-server-$dockerfile.tar
-
     - stage: test
-      env: dockerfile=fedora-34 readonly=--read-only seccomp=unconfined
-      workspaces:
-        use: fedora-34
-    - env: dockerfile=fedora-34 docker='sudo podman'
-      workspaces:
-        use: fedora-34
-    - env: dockerfile=fedora-34 docker=podman replica=none
-      workspaces:
-        use: fedora-34
-
-    - &test-k3s
       env: dockerfile=fedora-34
-      install: skip
-      after_failure: skip
-      script: tests/run-master-in-k3s.sh local/freeipa-server:$dockerfile local-freeipa-server-$dockerfile.tar
-      workspaces:
-        use: fedora-34
-
+    - env: dockerfile=fedora-34 docker='sudo podman'
+    - env: dockerfile=fedora-34 docker=podman replica=none
