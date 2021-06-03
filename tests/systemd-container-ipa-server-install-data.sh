@@ -9,10 +9,10 @@ D="$2"
 docker=${docker:-docker}
 
 EXIT=false
-if ! $docker exec $C ipa-server-install -U -r EXAMPLE.TEST -p Secret123 -a Secret123 --setup-dns --no-forwarders --no-ntp ; then
+if ! $docker exec $C ipa-server-install -U -r EXAMPLE.TEST -p 'Secret$$123' -a 'Secret$$123' --setup-dns --no-forwarders --no-ntp ; then
 	EXIT=true
 fi
-if ! "$EXIT" && ! $docker exec $C ipa-adtrust-install -a Secret123 --netbios-name=EXAMPLE -U ; then
+if ! "$EXIT" && ! $docker exec $C ipa-adtrust-install -a 'Secret$$123' --netbios-name=EXAMPLE -U ; then
 	EXIT=true
 fi
 FAILED=$( $docker exec $C systemctl list-units --state=failed --no-pager -l --no-legend | tee /dev/stderr | sed 's/ .*//' | sort )
@@ -25,7 +25,7 @@ fi
 if $EXIT ; then
 	exit 1
 fi
-$docker exec $C bash -c 'echo Secret123 | kinit admin'
+$docker exec $C bash -c 'echo Secret\$\$123 | kinit admin'
 $docker exec $C ipa user-add --first Bob --last Nowak bob
 $docker exec $C id bob
 

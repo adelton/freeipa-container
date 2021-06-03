@@ -16,7 +16,7 @@ kind: Secret
 metadata:
   name: freeipa-server-password
 stringData:
-  admin.password: Secret123
+  admin.password: Secret$$123
 ---
 apiVersion: v1
 kind: Service

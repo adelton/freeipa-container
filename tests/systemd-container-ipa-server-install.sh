@@ -9,7 +9,7 @@ shift
 docker=${docker:-docker}
 
 EXIT=false
-if ! $docker exec $C ipa-server-install -U -r EXAMPLE.TEST -p Secret123 -a Secret123 --setup-dns --no-forwarders --no-ntp ; then
+if ! $docker exec $C ipa-server-install -U -r EXAMPLE.TEST -p 'Secret$$123' -a 'Secret$$123' --setup-dns --no-forwarders --no-ntp ; then
 	EXIT=true
 fi
 FAILED=$( $docker exec $C systemctl list-units --state=failed --no-pager -l --no-legend | tee /dev/stderr | sed 's/ .*//' | sort )

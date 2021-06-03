@@ -86,7 +86,7 @@ function run_ipa_container() {
 	$docker run $readonly_run -d --name "$N" -h $HOSTNAME \
 		$OPTS \
 		-v $VOLUME:/data:Z $DOCKER_RUN_OPTS \
-		-e PASSWORD=Secret123 "$IMAGE" "$@"
+		-e PASSWORD='Secret$$123' "$IMAGE" "$@"
 	)
 	wait_for_ipa_container "$N" "$@"
 }
@@ -155,11 +155,11 @@ for i in $( seq 1 20 ) ; do
 done
 (
 set -x
-$docker exec freeipa-master bash -c 'yes Secret123 | kinit admin'
+$docker exec freeipa-master bash -c 'yes Secret\$\$123 | kinit admin'
 $docker exec freeipa-master ipa user-add --first Bob --last Nowak bob$$
 $docker exec freeipa-master id bob$$
 
-$docker exec freeipa-master ipa-adtrust-install -a Secret123 --netbios-name=EXAMPLE -U
+$docker exec freeipa-master ipa-adtrust-install -a 'Secret$$123' --netbios-name=EXAMPLE -U
 )
 
 if [ "$replica" = 'none' ] ; then
@@ -184,7 +184,7 @@ if $docker diff freeipa-master | tee /dev/stderr | grep -Evf tests/docker-diff-i
 	exit 1
 fi
 if [ -z "$SETUP_CA" ] ; then
-	$docker exec freeipa-replica ipa-ca-install -p Secret123
+	$docker exec freeipa-replica ipa-ca-install -p 'Secret$$123'
 	$docker exec freeipa-replica systemctl is-system-running
 fi
 echo OK $0.
