@@ -24,7 +24,7 @@ script:
 - ( sleep 10 ; $docker rm -f systemd ) & systemd-run --scope --user $docker run --log-level debug --name systemd -ti --rm systemd /usr/sbin/init --log-level debug
 
 after_failure:
-- sudo grep -i seccomp /var/log/audit/audit.log
+- sudo journalctl -l | grep -i seccomp
 
 stages:
 - test
