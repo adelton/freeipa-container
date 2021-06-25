@@ -20,7 +20,7 @@ before_script:
 
 script:
 - $docker build -t systemd -f Dockerfile.$dockerfile .
-- ( sleep 10 ; $docker rm -f systemd ) & $docker run --name systemd -ti --rm systemd /usr/sbin/init --log-level debug
+- ( sleep 10 ; $docker rm -f systemd ) & systemd-run --scope --user $docker run --name systemd -ti --rm systemd /usr/sbin/init --log-level debug
 
 stages:
 - test
