@@ -20,6 +20,7 @@ before_script:
 
 script:
 - $docker build -t systemd -f Dockerfile.$dockerfile .
+- find /sys/fs/cgroup/ -type d -exec stat \{\} \; && cat /proc/self/cgroup && ps auxww
 - ( sleep 10 ; $docker rm -f systemd ) & systemd-run --scope --user $docker run --log-level debug --name systemd -ti --rm systemd /usr/sbin/init --log-level debug
 
 stages:
@@ -28,6 +29,4 @@ stages:
 jobs:
   include:
     - stage: test
-      env: dockerfile=fedora-34
-    - env: dockerfile=fedora-34 docker='sudo podman'
-    - env: dockerfile=fedora-34 docker=podman replica=none
+      env: dockerfile=fedora-34 docker=podman
