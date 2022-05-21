@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ fedora-rawhide, fedora-37, fedora-36, centos-9-stream, centos-8-stream, rocky-9, rocky-8, almalinux-9, almalinux-8, centos-7 ]
-        docker: [ docker ]
+        docker: [ podman ]
         include:
           - os: rhel-9
             docker: podman
