@@ -11,7 +11,7 @@ env:
   TRAVIS: yes-similar-ubuntu-environment
 jobs:
   list-of-oses:
-    name: Produce list of OSes as JSON string
+    name: Hold list of OSes for which we build
     runs-on: ubuntu-22.04
     env:
       all_oses: fedora-rawhide fedora-36 fedora-35
@@ -24,45 +24,6 @@ jobs:
       - id: set-jsonstring
         run: echo '::set-output name=jsonstring::["'${all_oses// /\", \"}'"]'
 
-  test-parameters:
-    name: Produce matrixes for tests based on what images are new
-    runs-on: ubuntu-22.04
-    needs:
-      - list-of-oses
-      - build
-    outputs:
-      test-docker: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      test-docker-20-04: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      test-podman: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      test-rootless-podman: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      test-upgrade: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      test-upgrade-podman: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      test-upgrade-20-04: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      test-k3s: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      test-k3s-20-04: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      test-k3s-docker-20-04: ${{ steps.set-jsonstring.outputs.jsonstring }}
-      push-after-success: ${{ steps.set-jsonstring.outputs.jsonstring }}
-    steps:
-      - run: |
-          for i in ${{ needs.list-of-oses.outputs.all-oses }} ; do
-            if [ ${{ needs.build.outputs.${i} }} == '' ] ; then
-              ALL_CHANGED="$ALL_CHANGED $i"
-            fi
-          done
-      - run: echo Changed $ALL_CHANGED
-      - run: |
-          if [ ${{ needs.build.outputs.image-the-same == '' ] ; then
-            echo No image is the same.
-          else
-            echo At least one image is the same.
-          fi
-      - run: |
-          if [ ${{ needs.build.outputs.image-not-the-same == '' ] ; then
-            echo No image changed.
-          else
-            echo At least one image changed.
-          fi
-
   build:
     name: Build image
     runs-on: ubuntu-22.04
@@ -71,22 +32,6 @@ jobs:
       fail-fast: false
       matrix:
         os: ${{ fromJson(needs.list-of-oses.outputs.jsonstring) }}
-    outputs:
-      image-the-same: ${{ steps.check-image-the-same.outputs.image-the-same }}
-      image-not-the-same: ${{ steps.check-image-the-same.outputs.image-not-the-same }}
-      fedora-rawhide: ${{ steps.check-image-the-same.outputs.fedora-rawhide }}
-      fedora-36: ${{ steps.check-image-the-same.outputs.fedora-36 }}
-      fedora-35: ${{ steps.check-image-the-same.outputs.fedora-35 }}
-      centos-9-stream: ${{ steps.check-image-the-same.outputs.centos-9-stream }}
-      centos-8-stream: ${{ steps.check-image-the-same.outputs.centos-8-stream }}
-      centos-7: ${{ steps.check-image-the-same.outputs.centos-7 }}
-      rhel-9: ${{ steps.check-image-the-same.outputs.rhel-9 }}
-      rhel-8: ${{ steps.check-image-the-same.outputs.rhel-8 }}
-      rhel-7: ${{ steps.check-image-the-same.outputs.rhel-7 }}
-      almalinux-9: ${{ steps.check-image-the-same.outputs.almalinux-9 }}
-      almalinux-8: ${{ steps.check-image-the-same.outputs.almalinux-8 }}
-      rocky-9: ${{ steps.check-image-the-same.outputs.rocky-9 }}
-      rocky-8: ${{ steps.check-image-the-same.outputs.rocky-8 }}
     steps:
       - uses: actions/checkout@v2
       - name: Separate git work tree with just the files needed for build
@@ -116,19 +61,22 @@ jobs:
         run: |
           skopeo inspect docker-daemon:localhost/freeipa-server:${{ matrix.os }} | jq '.Labels'
           diff -u <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq '.Labels' ) <( skopeo inspect docker-daemon:localhost/freeipa-server:${{ matrix.os }} | jq '.Labels' ) || true
+      - name: Create directory for artifacts
+        run: mkdir freeipa-server-${{ matrix.os }}
       - id: check-image-the-same
         name: Mark image being the same
-        run: if cmp <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) <( skopeo inspect docker-daemon:localhost/freeipa-server:${{ matrix.os }} | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) ; then echo "::set-output name=image-the-same::${{ matrix.os }}" ; echo "::set-output name=${{ matrix.os }}::image-the-same" ; else echo "::set-output name=image-not-the-same::${{ matrix.os }}" ; fi
-      - name: Create directory for artifacts
-        if: steps.check-image-the-same.outputs.image-not-the-same != ''
-        run: mkdir freeipa-server-${{ matrix.os }}
+        run: if cmp <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) <( skopeo inspect docker-daemon:localhost/freeipa-server:${{ matrix.os }} | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) ; then echo image-the-same > freeipa-server-${{ matrix.os }}/${{ matrix.os }}-build ; else echo image-not-the-same > freeipa-server-${{ matrix.os }}/${{ matrix.os }}-build ; echo "::set-output name=image-not-the-same::${{ matrix.os }}" ; fi
+      - uses: actions/upload-artifact@v3
+        with:
+          name: builds
+          path: freeipa-server-${{ matrix.os }}
       - name: Save image
         if: steps.check-image-the-same.outputs.image-not-the-same != ''
         run: docker save localhost/freeipa-server:${{ matrix.os }} | gzip > freeipa-server-${{ matrix.os }}/freeipa-server-${{ matrix.os }}.tar.gz
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: freeipa-server-${{ matrix.os }}
-          path: freeipa-server-${{ matrix.os }}
+          path: freeipa-server-${{ matrix.os }}/*.tar.gz
         if: steps.check-image-the-same.outputs.image-not-the-same != ''
 
   gather-results:
@@ -136,11 +84,9 @@ jobs:
     runs-on: ubuntu-22.04
     needs: build
     steps:
-      - run: echo ${{ needs.build.outputs.image-the-same }}
-      - run: echo ${{ needs.build.outputs.image-not-the-same }}
-      - run: echo 'fedora-rawhide is the same:' ${{ needs.build.outputs.fedora-rawhide }}
-      - run: echo 'fedora-36 is the same:' ${{ needs.build.outputs.fedora-36 }}
-      - run: echo 'fedora-35 is the same:' ${{ needs.build.outputs.fedora-35 }}
-      - run: echo ${{ needs.build.matrix }}
-      - run: echo ${{ needs.build.matrix.os }}
+      - uses: actions/download-artifact@v3
+        with:
+          name: builds
+      - run: ls -la
+      - run: cat *
 
