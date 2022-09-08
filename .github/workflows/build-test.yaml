@@ -17,9 +17,51 @@ jobs:
       all_oses: fedora-rawhide fedora-36 fedora-35
     outputs:
       jsonstring: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      all-oses: ${{ steps.set-all-oses.outputs.all_oses }}
     steps:
+      - id: set-all-oses
+        run: echo "::set-output name=all_oses::$all_oses"
       - id: set-jsonstring
         run: echo '::set-output name=jsonstring::["'${all_oses// /\", \"}'"]'
+
+  test-parameters:
+    name: Produce matrixes for tests based on what images are new
+    runs-on: ubuntu-22.04
+    needs:
+      - list-of-oses
+      - build
+    outputs:
+      test-docker: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      test-docker-20-04: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      test-podman: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      test-rootless-podman: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      test-upgrade: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      test-upgrade-podman: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      test-upgrade-20-04: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      test-k3s: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      test-k3s-20-04: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      test-k3s-docker-20-04: ${{ steps.set-jsonstring.outputs.jsonstring }}
+      push-after-success: ${{ steps.set-jsonstring.outputs.jsonstring }}
+    steps:
+      - run: |
+          for i in ${{ needs.list-of-oses.outputs.all-oses }} ; do
+            if [ ${{ needs.build.outputs.${i} }} == '' ] ; then
+              ALL_CHANGED="$ALL_CHANGED $i"
+            fi
+          done
+      - run: echo Changed $ALL_CHANGED
+      - run: |
+          if [ ${{ needs.build.outputs.image-the-same == '' ] ; then
+            echo No image is the same.
+          else
+            echo At least one image is the same.
+          fi
+      - run: |
+          if [ ${{ needs.build.outputs.image-not-the-same == '' ] ; then
+            echo No image changed.
+          else
+            echo At least one image changed.
+          fi
 
   build:
     name: Build image
@@ -35,6 +77,16 @@ jobs:
       fedora-rawhide: ${{ steps.check-image-the-same.outputs.fedora-rawhide }}
       fedora-36: ${{ steps.check-image-the-same.outputs.fedora-36 }}
       fedora-35: ${{ steps.check-image-the-same.outputs.fedora-35 }}
+      centos-9-stream: ${{ steps.check-image-the-same.outputs.centos-9-stream }}
+      centos-8-stream: ${{ steps.check-image-the-same.outputs.centos-8-stream }}
+      centos-7: ${{ steps.check-image-the-same.outputs.centos-7 }}
+      rhel-9: ${{ steps.check-image-the-same.outputs.rhel-9 }}
+      rhel-8: ${{ steps.check-image-the-same.outputs.rhel-8 }}
+      rhel-7: ${{ steps.check-image-the-same.outputs.rhel-7 }}
+      almalinux-9: ${{ steps.check-image-the-same.outputs.almalinux-9 }}
+      almalinux-8: ${{ steps.check-image-the-same.outputs.almalinux-8 }}
+      rocky-9: ${{ steps.check-image-the-same.outputs.rocky-9 }}
+      rocky-8: ${{ steps.check-image-the-same.outputs.rocky-8 }}
     steps:
       - uses: actions/checkout@v2
       - name: Separate git work tree with just the files needed for build
