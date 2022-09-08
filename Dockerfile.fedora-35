@@ -1,4 +1,5 @@
 # Clone from the Fedora 35
+# FIXME: test
 FROM registry.fedoraproject.org/fedora:35
 
 RUN groupadd -g 288 kdcproxy ; useradd -u 288 -g 288 -c 'IPA KDC Proxy User' -r -d '/var/lib/kdcproxy' -s '/sbin/nologin' kdcproxy
