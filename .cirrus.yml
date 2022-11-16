@@ -6,15 +6,16 @@ docker_builder:
       - os: fedora-37
       - os: centos-9-stream
   config_script: |
-    getent passwd
-    useradd -u 2001 -g 2001 testrunner
+    groupadd -g 200000 testuser
+    useradd -u 200000 -g 200000 testuser
+    sed -i 's/^docker:.*/&testuser/' /etc/group
     echo '{"userns-remap": "default"}' > /etc/docker/daemon.json
     echo '{"userns-remap": "default"}' > /etc/docker/daemon.json
-    ( echo "dockremap:2001:1" ; echo dockremap:200001:65535 ) > /etc/subuid
-    ( echo "dockremap:2001:1" ; echo dockremap:200001:65535 ) > /etc/subgid
+    echo dockremap:200000:65536 > /etc/subuid
+    echo dockremap:200000:65536 > /etc/subgid
     systemctl restart docker
-  build_script: su -l testrunner -c "docker build -t localhost/freeipa/freeipa-server:$os -f Dockerfile.$os ."
-  test_script: su -l testrunner -c "tests/run-master-and-replica.sh localhost/freeipa/freeipa-server:$os"
+  build_script: runuser -u testuser -- docker build -t localhost/freeipa/freeipa-server:$os -f Dockerfile.$os .
+  test_script: runuser -u testuser -- tests/run-master-and-replica.sh localhost/freeipa/freeipa-server:$os
 
 docker_builder:
   name: FreeIPA server in podman
