@@ -1,0 +1,30 @@
+docker_builder:
+  name: FreeIPA server in docker
+  env:
+    CIRRUS_ARCH: arm64
+    matrix:
+      - os: fedora-37
+      - os: centos-9-stream
+  config_script: |
+    getent passwd
+    useradd -u 2001 -g 2001 testrunner
+    echo '{"userns-remap": "default"}' > /etc/docker/daemon.json
+    echo '{"userns-remap": "default"}' > /etc/docker/daemon.json
+    ( echo "dockremap:2001:1" ; echo dockremap:200001:65535 ) > /etc/subuid
+    ( echo "dockremap:2001:1" ; echo dockremap:200001:65535 ) > /etc/subgid
+    systemctl restart docker
+  build_script: su -l testrunner -c "docker build -t localhost/freeipa/freeipa-server:$os -f Dockerfile.$os ."
+  test_script: su -l testrunner -c "tests/run-master-and-replica.sh localhost/freeipa/freeipa-server:$os"
+
+docker_builder:
+  name: FreeIPA server in podman
+  env:
+    CIRRUS_ARCH: arm64
+    matrix:
+      - os: fedora-37
+      - os: centos-9-stream
+  install_script:
+    - sudo apt-get -y update
+    - sudo apt-get -y install podman
+  build_script: podman build -t localhost/freeipa/freeipa-server:$os -f Dockerfile.$os .
+  test_script: docker=podman tests/run-master-and-replica.sh localhost/freeipa/freeipa-server:$os
