@@ -11,6 +11,8 @@ commands:
     steps:
       - run: sudo apt-get update -y
       - run: sudo apt-get install -y podman
+      - run: mkdir -p ~/.config/containers/containers.conf.d
+      - run: ( echo '[engine]' ; echo 'cgroup_manager = "cgroupfs"' ) > ~/.config/containers/containers.conf.d/podman-issue-16529.conf
 
 jobs:
   build-and-run-container:
@@ -34,7 +36,7 @@ jobs:
             - configure-docker
       - when:
           condition:
-            equal: [ << parameters.docker >>, "podman --cgroup-manager cgroupfs" ]
+            equal: [ << parameters.docker >>, podman ]
           steps:
             - install-podman
       - run: << parameters.docker >> build -t localhost/freeipa/freeipa-server -f Dockerfile.<< parameters.os >> .
@@ -49,4 +51,4 @@ workflows:
       - build-and-run-container:
           name: "CentOS 9 Stream on podman"
           os: centos-9-stream
-          docker: "podman --cgroup-manager cgroupfs"
+          docker: podman
