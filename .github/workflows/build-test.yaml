@@ -97,6 +97,7 @@ jobs:
       - uses: ./.github/actions/stock-docker.io
         if: runner.os != 'macos'
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
+        if: runner.os != 'macos'
       - uses: actions/download-artifact@v3
         with:
           name: freeipa-server-${{ matrix.os }}
