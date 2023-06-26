@@ -28,6 +28,11 @@ jobs:
           && sudo apt-get update -y \
           && sudo apt-get install -y podman skopeo
         if: matrix.docker == 'podman'
+      - name: Setup docker (missing on MacOS)
+        run: |
+          brew install docker
+          colima start
+        if: runner.os == 'macos'
       - uses: actions/checkout@v3
       - name: Separate git work tree with just the files needed for build
         run: git worktree add --no-checkout ../minimize-for-build
@@ -96,6 +101,11 @@ jobs:
           - os: fedora-38
     steps:
       - uses: actions/checkout@v3
+      - name: Setup docker (missing on MacOS)
+        run: |
+          brew install docker
+          colima start
+        if: runner.os == 'macos'
       - uses: ./.github/actions/stock-docker.io
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
       - uses: actions/download-artifact@v3
