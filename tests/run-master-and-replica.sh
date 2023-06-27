@@ -83,6 +83,7 @@ function run_ipa_container() {
 		else
 			OPTS="-v /sys/fs/cgroup:/sys/fs/cgroup:ro --sysctl net.ipv6.conf.all.disable_ipv6=0"
 		fi
+		OPTS="--sysctl net.ipv6.conf.all.disable_ipv6=0"
 	fi
 	if [ -n "$seccomp" ] ; then
 		OPTS="$OPTS --security-opt seccomp=$seccomp"
