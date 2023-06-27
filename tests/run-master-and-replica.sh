@@ -98,11 +98,15 @@ function run_ipa_container() {
 		OPTS="$OPTS -h $HOSTNAME"
 	fi
 	(
+	set +e
 	set -x
 	umask 0
 	$docker run -i $readonly_run --name "$N" $OPTS \
 		-v $VOLUME:/data:Z $DOCKER_RUN_OPTS \
-		-e PASSWORD=Secret123 "$IMAGE" "$@"
+		-e PASSWORD=Secret123 -e DEBUG_TRACE=true "$IMAGE" "$@"
+	ls -la $VOLUME
+	cat $VOLUME/var/log/ipa-server-configure-first.log
+	cat $VOLUME/var/log/ipa-server-run.log
 	)
 	wait_for_ipa_container "$N" "$@"
 }
