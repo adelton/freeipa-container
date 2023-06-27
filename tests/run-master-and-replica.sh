@@ -99,7 +99,7 @@ function run_ipa_container() {
 	(
 	set -x
 	umask 0
-	$docker run $readonly_run -d --name "$N" $OPTS \
+	$docker run -i $readonly_run --name "$N" $OPTS \
 		-v $VOLUME:/data:Z $DOCKER_RUN_OPTS \
 		-e PASSWORD=Secret123 "$IMAGE" "$@"
 	)
