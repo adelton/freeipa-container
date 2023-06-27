@@ -50,20 +50,20 @@ SUFFIX=${DOCKERFILE#Dockerfile.}
 END=$( wc -l < "$DOCKERFILE" )
 START=1
 while [ "$START" -lt "$END" ] ; do
-	SED_TO_NEXT_TEST='1,/^# test:/{s/^# \(debug\|test-add\):\s*//;p}'
+	SED_TO_NEXT_TEST='1,/^# test:/{s/^# \(debug\|test-add\):\ *//;p}'
 	if [ "$START" = '1' ] ; then
 		echo "# This line is commented out to match line count" > "$DOCKERFILE.part"
-		sed -n "$SED_TO_NEXT_TEST" "$DOCKERFILE" >> "$DOCKERFILE.part"
+		sed --posix -n "$SED_TO_NEXT_TEST" "$DOCKERFILE" >> "$DOCKERFILE.part"
 	else
 		echo "FROM localhost/freeipa-server-test:$SUFFIX" > "$DOCKERFILE.part"
-		sed -n "1,${START}{s/^/## /;p;d};$SED_TO_NEXT_TEST" "$DOCKERFILE" >> "$DOCKERFILE.part"
+		sed --posix -n "1,${START}{s/^/## /;p;d};$SED_TO_NEXT_TEST" "$DOCKERFILE" >> "$DOCKERFILE.part"
 	fi
 
-	TEST_SCRIPT=$( sed -n '$s/^# test:\s*//;T;s/\( \|$\)/ 'freeipa-server-container-$SUFFIX' /;p' "$DOCKERFILE.part" )
+	TEST_SCRIPT=$( sed --posix '$s/^# test:\ *\([a-zA-Z0-9.-]*\)/\1 'freeipa-server-container-$SUFFIX'/;t;d' "$DOCKERFILE.part" )
 	if [ -n "$TEST_SCRIPT" ] ; then
 		$docker build -t "localhost/freeipa-server-test:$SUFFIX" -f "$DOCKERFILE.part" .
 		echo "FROM localhost/freeipa-server-test:$SUFFIX" > "$DOCKERFILE.part.addons"
-		sed -n 's/# test-addon:\s*//;T;p' "$DOCKERFILE.part" >> "$DOCKERFILE.part.addons"
+		sed --posix 's/# test-addon:\ *//;t;d' "$DOCKERFILE.part" >> "$DOCKERFILE.part.addons"
 		$docker build -t "localhost/freeipa-server-test-addons:$SUFFIX" -f "$DOCKERFILE.part.addons" .
 		$docker rm -f freeipa-server-container-$SUFFIX > /dev/null 2>&1 || :
 		# Starting systemd container
