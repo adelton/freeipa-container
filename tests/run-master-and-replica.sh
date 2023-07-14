@@ -234,4 +234,9 @@ if [ -z "$SETUP_CA" ] ; then
 	$docker exec freeipa-replica ipa-ca-install -p Secret123
 	$docker exec freeipa-replica systemctl is-system-running
 fi
+
+$docker exec freeipa-master ipa-backup
+$docker exec freeipa-master bash -c 'cd /var/lib/ipa/backup/ipa-full-* && ( echo Secret123 ; echo yes ) | ipa-restore $(pwd)'
+$docker exec freeipa-master ipactl start
+
 echo OK $0.
