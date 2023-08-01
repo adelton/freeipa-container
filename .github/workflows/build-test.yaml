@@ -14,15 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ fedora-rawhide, fedora-38, fedora-37, centos-9-stream, centos-8-stream, rocky-9, rocky-8, almalinux-9, almalinux-8, centos-7 ]
+        os: [ fedora-rawhide, fedora-38, centos-7 ]
         docker: [ docker ]
-        include:
-          - os: rhel-9
-            docker: podman
-          - os: rhel-8
-            docker: podman
-          - os: rhel-7
-            docker: podman
     steps:
       - name: Install podman 4.*
         run: |
@@ -74,13 +67,21 @@ jobs:
       - name: Check resulting labels
         run: |
           skopeo inspect docker-daemon:localhost/freeipa-server:${{ matrix.os }} | jq '.Labels'
+          mkdir -p run-tests
+          touch run-tests/${{ matrix.os }}
           diff -u <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq '.Labels' ) <( skopeo inspect docker-daemon:localhost/freeipa-server:${{ matrix.os }} | jq '.Labels' ) || true
+          diff -u <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) <( skopeo inspect docker-daemon:localhost/freeipa-server:${{ matrix.os }} | jq '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) || echo ${{ matrix.os }} > run-tests/${{ matrix.os }}
         if: matrix.docker != 'podman'
       - name: Check resulting labels
         run: |
           skopeo inspect containers-storage:localhost/freeipa-server:${{ matrix.os }} | jq '.Labels'
-          diff -u <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq '.Labels' ) <( skopeo inspect containers-storage:localhost/freeipa-server:${{ matrix.os }} | jq '.Labels' ) || true
+          mkdir -p run-tests
+          diff -u <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq '.Labels' ) <( skopeo inspect containers-storage:localhost/freeipa-server:${{ matrix.os }} | jq '.Labels' ) || touch run-tests/${{ matrix.os }}
         if: matrix.docker == 'podman'
+      - uses: actions/upload-artifact@v3
+        with:
+          name: run-tests
+          path: run-tests
       - name: Create directory for artifacts
         run: mkdir freeipa-server-${{ matrix.os }}
       - name: Save image
@@ -97,34 +98,37 @@ jobs:
           path: freeipa-server-${{ matrix.os }}
           retention-days: 1
 
+  test-matrix:
+    runs-on: ubuntu-22.04
+    needs: [ build ]
+    strategy:
+      fail-fast: false
+    steps:
+      - run: echo ${{ needs.build.matrix }} ${{ needs.build.matrix.os }}
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: run-tests
+          path: run-tests
+      - name: Skip the rest of the workflow if no new images built
+        run: if [ -z "$( cat run-tests/* )" ] ; then gh run cancel ${{ github.run_id }} ; gh run watch ${{ github.run_id }} ; fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: set-json-matrix
+        run: |
+          X=$( echo $( cat run-tests/* ) | sed -e 's/^/["/' -e 's/$/"]/' -e 's/ /","/g' -e 's/""//' )
+          echo "matrix=$X" >> $GITHUB_OUTPUT
+    outputs:
+      matrix: ${{ steps.set-json-matrix.outputs.matrix }}
+
   test-docker:
     name: Run with docker
     runs-on: ubuntu-22.04
-    needs: [ build ]
+    needs: [ test-matrix ]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: fedora-38
-          - os: fedora-38
-            readonly: --read-only
-          - os: fedora-38
-            readonly: --read-only
-            ca: --external-ca
-          - os: fedora-rawhide
-          - os: centos-9-stream
-          - os: centos-9-stream
-            readonly: --read-only
-          - os: centos-9-stream
-            readonly: --read-only
-            ca: --external-ca
-          - os: centos-8-stream
-          - os: centos-8-stream
-            readonly: --read-only
-          - os: centos-8-stream
-            readonly: --read-only
-            ca: --external-ca
-        os: [ fedora-37, rhel-9, rhel-8, almalinux-9 ]
+        os: ${{ fromJson(needs.test-matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/stock-docker.io
@@ -145,336 +149,4 @@ jobs:
       - name: Run partial tests
         if: ${{ failure() }}
         run: tests/run-partial-tests.sh Dockerfile.${{ matrix.os }}
-
-  test-docker-20-04:
-    name: Run with docker on Ubuntu 20.04
-    runs-on: ubuntu-20.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: fedora-38
-            readonly: --read-only
-          - os: centos-9-stream
-            readonly: --read-only
-          - os: centos-8-stream
-            readonly: --read-only
-          - os: centos-7
-            protected_regular: unset
-          - os: rhel-7
-            protected_regular: unset
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Decrypt artifacts that were encrypted after build
-        uses: ./.github/actions/decrypt-file
-        if: ${{ startsWith(matrix.os, 'rhel-') }}
-        with:
-          file: freeipa-server-${{ matrix.os }}.tar.gz
-          secret: ${{ secrets.UPLOAD_SECRET }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | docker load
-      - name: Disable fs.protected_regular
-        if: ${{ matrix.protected_regular == 'unset' }}
-        run: sudo sysctl fs.protected_regular=0
-      - name: Run master and replica
-        run: readonly=${{ matrix.readonly }} ca=${{ matrix.ca }} seccomp=${{ matrix.seccomp }} replica=${{ matrix.replica }} tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-      - name: Run partial tests
-        if: ${{ failure() }}
-        run: tests/run-partial-tests.sh Dockerfile.${{ matrix.os }}
-
-  test-podman:
-    name: Run with sudo podman
-    runs-on: ubuntu-22.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ fedora-38, centos-9-stream, centos-8-stream ]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Decrypt artifacts that were encrypted after build
-        uses: ./.github/actions/decrypt-file
-        if: ${{ startsWith(matrix.os, 'rhel-') }}
-        with:
-          file: freeipa-server-${{ matrix.os }}.tar.gz
-          secret: ${{ secrets.UPLOAD_SECRET }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | sudo podman load
-      - name: Run master and replica
-        run: docker='sudo podman' tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-      - name: Run partial tests
-        if: ${{ failure() }}
-        run: docker='sudo podman' tests/run-partial-tests.sh Dockerfile.${{ matrix.os }}
-
-  test-rootless-podman:
-    name: Run with rootless podman
-    runs-on: ubuntu-22.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ fedora-38, rhel-9, rhel-8, centos-9-stream, centos-8-stream, rocky-9, rocky-8, almalinux-8 ]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Decrypt artifacts that were encrypted after build
-        uses: ./.github/actions/decrypt-file
-        if: ${{ startsWith(matrix.os, 'rhel-') }}
-        with:
-          file: freeipa-server-${{ matrix.os }}.tar.gz
-          secret: ${{ secrets.UPLOAD_SECRET }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | podman load
-      - name: Enable ssh access to self
-        run: ssh-keygen -f ~/.ssh/id_rsa && cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 400 ~/.ssh/authorized_keys && chmod o-w ~
-      - name: Run master
-        shell: ssh -o StrictHostKeyChecking=no localhost bash {0}
-        run: cd ${{ github.workspace }} && docker=podman tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }} && podman pod ls -q | xargs podman pod rm -f
-      - name: Run partial tests
-        if: ${{ failure() }}
-        shell: ssh localhost bash {0}
-        run: cd ${{ github.workspace }} && docker=podman tests/run-partial-tests.sh Dockerfile.${{ matrix.os }}
-
-  test-upgrade:
-    name: Upgrade from older version or build
-    runs-on: ubuntu-22.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: fedora-38
-            data-from: fedora-37
-          - os: fedora-38
-            data-from: fedora-36
-          - os: rhel-8
-            data-from: centos-8
-          - os: centos-8-stream
-            data-from: centos-8
-          - os: rocky-8
-            data-from: centos-8
-          - os: almalinux-8
-            data-from: centos-8
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/stock-docker.io
-      - uses: ./.github/actions/docker-cgroups-ubuntu-22
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Decrypt artifacts that were encrypted after build
-        uses: ./.github/actions/decrypt-file
-        if: ${{ startsWith(matrix.os, 'rhel-') }}
-        with:
-          file: freeipa-server-${{ matrix.os }}.tar.gz
-          secret: ${{ secrets.UPLOAD_SECRET }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | docker load
-      - name: Populate volume with data
-        run: docker volume create loaded-data && docker create --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop && mkdir /tmp/freeipa-data && docker run --security-opt label=disable --volumes-from loaded-data -v /tmp/freeipa-data:/data-out:z --rm docker.io/library/busybox sh -c 'cd /data && cp -a . /data-out'
-      - name: Run master and replica
-        run: VOLUME=/tmp/freeipa-data replica=none tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-
-  test-upgrade-podman:
-    name: Upgrade from older version with podman
-    runs-on: ubuntu-22.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: fedora-38
-            data-from: fedora-37
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Decrypt artifacts that were encrypted after build
-        uses: ./.github/actions/decrypt-file
-        if: ${{ startsWith(matrix.os, 'rhel-') }}
-        with:
-          file: freeipa-server-${{ matrix.os }}.tar.gz
-          secret: ${{ secrets.UPLOAD_SECRET }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | podman load
-      - name: Populate volume with data
-        run: podman volume create loaded-data && podman run --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop || true
-      - name: Copy the content of the volume to directory
-        run: mkdir /tmp/freeipa-data && podman run --volumes-from loaded-data -v /tmp/freeipa-data:/data-out:z --rm docker.io/library/busybox sh -c 'cd /data && cp -a . /data-out'
-      - name: Run master and replica
-        run: docker=podman VOLUME=/tmp/freeipa-data replica=none tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-
-  test-upgrade-20-04:
-    name: Upgrade from older version or build on Ubuntu 20.04
-    runs-on: ubuntu-20.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: fedora-38
-            data-from: fedora-37
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Decrypt artifacts that were encrypted after build
-        uses: ./.github/actions/decrypt-file
-        if: ${{ startsWith(matrix.os, 'rhel-') }}
-        with:
-          file: freeipa-server-${{ matrix.os }}.tar.gz
-          secret: ${{ secrets.UPLOAD_SECRET }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | docker load
-      - name: Populate volume with data
-        run: docker volume create loaded-data && docker create --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop && mkdir /tmp/freeipa-data && docker run --security-opt label=disable --volumes-from loaded-data -v /tmp/freeipa-data:/data-out:z --rm docker.io/library/busybox sh -c 'cd /data && cp -a . /data-out'
-      - name: Run master and replica
-        run: VOLUME=/tmp/freeipa-data replica=none tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-
-  test-k3s:
-    name: Run with K3s with docker
-    runs-on: ubuntu-22.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ fedora-rawhide, fedora-38, rhel-9, rhel-8, centos-9-stream, centos-8-stream ]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/stock-docker.io
-      - uses: ./.github/actions/docker-cgroups-ubuntu-22
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Decrypt artifacts that were encrypted after build
-        uses: ./.github/actions/decrypt-file
-        if: ${{ startsWith(matrix.os, 'rhel-') }}
-        with:
-          file: freeipa-server-${{ matrix.os }}.tar.gz
-          secret: ${{ secrets.UPLOAD_SECRET }}
-      - name: Download latest cri-dockerd
-        run: curl -s ${{ github.api_url }}/repos/Mirantis/cri-dockerd/releases/latest | jq -r '.assets[].browser_download_url' | grep jammy_amd64.deb | tee /dev/stderr | xargs curl -LO
-      - name: Install cri-dockerd
-        run: sudo apt install -y ./cri-dockerd_*.deb
-      - name: Unset network-plugin
-        run: |
-          sudo mkdir /etc/systemd/system/cri-docker.service.d
-          ( echo '[Service]' ; echo 'ExecStart=' ; sed 's/ExecStart=.*/& --network-plugin=/;t;d' /lib/systemd/system/cri-docker.service ) | sudo tee /etc/systemd/system/cri-docker.service.d/network-plugin.conf
-          sudo systemctl daemon-reload
-          sudo systemctl restart cri-docker
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | docker load
-      - name: Run K3s and master in it
-        run: tests/run-master-in-k3s.sh localhost/freeipa-server:${{ matrix.os }}
-
-  test-k3s-20-04:
-    name: Run with K3s on Ubuntu 20.04
-    runs-on: ubuntu-20.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ fedora-38, centos-9-stream ]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Decrypt artifacts that were encrypted after build
-        uses: ./.github/actions/decrypt-file
-        if: ${{ startsWith(matrix.os, 'rhel-') }}
-        with:
-          file: freeipa-server-${{ matrix.os }}.tar.gz
-          secret: ${{ secrets.UPLOAD_SECRET }}
-      - name: Unzip the image
-        run: gunzip freeipa-server-${{ matrix.os }}.tar.gz
-      - name: Run K3s and master in it
-        run: tests/run-master-in-k3s.sh localhost/freeipa-server:${{ matrix.os }} freeipa-server-${{ matrix.os }}.tar
-
-  test-k3s-docker-20-04:
-    name: Run with K3s with docker on Ubuntu 20.04
-    runs-on: ubuntu-20.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ fedora-38, centos-9-stream ]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/stock-docker.io
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Decrypt artifacts that were encrypted after build
-        uses: ./.github/actions/decrypt-file
-        if: ${{ startsWith(matrix.os, 'rhel-') }}
-        with:
-          file: freeipa-server-${{ matrix.os }}.tar.gz
-          secret: ${{ secrets.UPLOAD_SECRET }}
-      - name: Download latest cri-dockerd
-        run: curl -s ${{ github.api_url }}/repos/Mirantis/cri-dockerd/releases/latest | jq -r '.assets[].browser_download_url' | grep focal_amd64.deb | tee /dev/stderr | xargs curl -LO
-      - name: Install cri-dockerd
-        run: sudo apt install -y ./cri-dockerd_*.deb
-      - name: Unset network-plugin
-        run: |
-          sudo mkdir /etc/systemd/system/cri-docker.service.d
-          ( echo '[Service]' ; echo 'ExecStart=' ; sed 's/ExecStart=.*/& --network-plugin=/;t;d' /lib/systemd/system/cri-docker.service ) | sudo tee /etc/systemd/system/cri-docker.service.d/network-plugin.conf
-          sudo systemctl daemon-reload
-          sudo systemctl restart cri-docker
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | docker load
-      - name: Run K3s and master in it
-        run: tests/run-master-in-k3s.sh localhost/freeipa-server:${{ matrix.os }}
-
-  push-after-success:
-    name: Push images to registries
-    runs-on: ubuntu-22.04
-    needs: [ test-docker, test-docker-20-04, test-podman, test-rootless-podman, test-upgrade, test-upgrade-20-04, test-k3s, test-k3s-20-04, test-k3s-docker-20-04 ]
-    if: github.event_name != 'pull_request' && github.repository == 'freeipa/freeipa-container' && github.ref == 'refs/heads/master'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ fedora-rawhide, fedora-38, fedora-37, centos-9-stream, centos-8-stream, rocky-9, rocky-8, almalinux-9, almalinux-8, centos-7 ]
-    steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Prepare authentication file
-        run: |
-          cat > auth.json << 'EOF'
-          ${{ secrets.REGISTRY_CREDENTIALS_FILE }}
-          EOF
-      - name: Copy ${{ matrix.os }} to registries
-        run: |
-          set -e
-          f=docker-archive:freeipa-server-${{ matrix.os }}.tar.gz
-          while read r ; do
-            if cmp \
-              <( skopeo inspect $r:${{ matrix.os }} \
-                | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) \
-              <( skopeo inspect $f \
-                | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) ; then
-              echo Built freeipa-server:${{ matrix.os }} is the same as image at ${r#docker://}, not pushing
-              continue
-            fi
-            echo Copying freeipa-server:${{ matrix.os }} to ${r#docker://}
-            skopeo copy --authfile=auth.json $f $r:${{ matrix.os }}
-            VERSION=$( skopeo inspect --format='{{index .Labels "org.opencontainers.image.version"}}' $f | sed 's/-.*//' )
-            test -n "$VERSION"
-            skopeo copy --authfile=auth.json $r:${{ matrix.os }} $r:${{ matrix.os }}-$VERSION
-            echo Tagged as ${{ matrix.os }}-$VERSION as well
-          done << 'EOF'
-          ${{ secrets.REGISTRY_TARGET_LIST }}
-          EOF
 
