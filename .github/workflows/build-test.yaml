@@ -19,7 +19,7 @@ jobs:
         uses: sclorg/testing-farm-as-github-action@v1
         with:
           api_key: ${{ secrets.TF_API_KEY }}
-          git_url: ${{ github.repositoryUrl }}
+          git_url: ${{ github.server_url }}/${{ github.repository }}
           git_ref: ${{ github.ref_name }}
           update_pull_request_status: "false"
 
