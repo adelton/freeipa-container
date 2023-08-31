@@ -22,6 +22,6 @@ jobs:
           git_url: ${{ github.server_url }}/${{ github.repository }}
           git_ref: ${{ github.ref_name }}
           update_pull_request_status: "false"
-          tf_scope: private
-          compose: RHEL-9.3.0-Nightly
+          tf_scope: public
+          compose: CentOS-Stream-9
 
