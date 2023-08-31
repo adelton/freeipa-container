@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Run build on Testing Farm
-        uses: sclorg/testing-farm-as-github-action@v1
+        uses: sclorg/testing-farm-as-github-action@e0698058cb49fcd6ebae84ade08d8ce8044a31c4
         with:
           api_key: ${{ secrets.TF_API_KEY }}
           git_url: ${{ github.server_url }}/${{ github.repository }}
