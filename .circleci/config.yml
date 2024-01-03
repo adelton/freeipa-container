@@ -18,7 +18,7 @@ commands:
              https://download.opensuse.org/repositories/devel:kubic:libcontainers:unstable/xUbuntu_$(lsb_release -rs)/ /"
              | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:unstable.list > /dev/null
       - run: sudo apt-get update -y
-      - run: sudo apt-get install -y podman
+      - run: sudo apt-get install -y podman fuse-overlayfs
 
 jobs:
   build-and-run-container:
