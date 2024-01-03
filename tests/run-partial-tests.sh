@@ -38,6 +38,7 @@ function run_and_wait_for () {
 			return
 		fi
 		if ! $docker ps | grep -q "\b$NAME$" ; then
+			$docker logs $NAME
 			return
 		fi
 		sleep 2
