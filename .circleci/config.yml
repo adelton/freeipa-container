@@ -45,8 +45,7 @@ jobs:
             equal: [ << parameters.docker >>, podman ]
           steps:
             - install-podman
-      - run: << parameters.docker >> build -t localhost/freeipa/freeipa-server -f Dockerfile.<< parameters.os >> .
-      - run: docker="<< parameters.docker >>" tests/run-master-and-replica.sh localhost/freeipa/freeipa-server
+      - run: docker="<< parameters.docker >>" tests/run-partial-tests.sh Dockerfile.<< parameters.os >>
 
 workflows:
   test-freeipa-container:
