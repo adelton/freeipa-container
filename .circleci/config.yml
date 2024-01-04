@@ -46,7 +46,7 @@ jobs:
             equal: [ << parameters.docker >>, podman ]
           steps:
             - install-podman
-      - run: sudo journalctl -fl & docker="<< parameters.docker >>" tests/run-partial-tests.sh Dockerfile.<< parameters.os >>
+      - run: ps axuwwf ; sudo tail -f /var/log/* & sudo journalctl -fl & docker="<< parameters.docker >>" tests/run-partial-tests.sh Dockerfile.<< parameters.os >>
 
 workflows:
   test-freeipa-container:
