@@ -3,10 +3,10 @@ docker_builder:
   env:
     CIRRUS_ARCH: arm64
     matrix:
-      - os: fedora-37
+      - os: fedora-39
   config_script:
     - groupadd -g 200000 testuser
-    - useradd -u 200000 -g 200000 testuser
+    - useradd -m -u 200000 -g 200000 testuser
     - sed -i 's/^docker:.*/&testuser/' /etc/group
     - echo '{"userns-remap":"default"}' > /etc/docker/daemon.json
     - echo '{"userns-remap":"default"}' > /etc/docker/daemon.json
