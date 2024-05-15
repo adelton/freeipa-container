@@ -26,9 +26,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
-        if: matrix.docker == 'podman'
       - name: Separate git work tree with just the files needed for build
         run: git worktree add --no-checkout ../minimize-for-build
       - name: Populate with the Dockerfile
@@ -257,8 +254,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
       - uses: actions/download-artifact@v4
         with:
           name: freeipa-server-${{ matrix.os }}
@@ -287,8 +282,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
       - uses: actions/download-artifact@v4
         with:
           name: freeipa-server-${{ matrix.os }}
@@ -359,8 +352,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
       - uses: actions/download-artifact@v4
         with:
           name: freeipa-server-${{ matrix.os }}

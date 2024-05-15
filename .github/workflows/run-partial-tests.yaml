@@ -52,9 +52,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
-        if: matrix.docker == 'podman' && matrix.runs-on != 'ubuntu-20.04'
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
         if: matrix.docker == 'docker' && matrix.runs-on != 'ubuntu-20.04'
       - run: sudo sysctl fs.protected_regular=0
