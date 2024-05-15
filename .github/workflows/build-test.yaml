@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -89,7 +89,7 @@ jobs:
 
   test-docker:
     name: Run with docker
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -138,7 +138,7 @@ jobs:
 
   test-rootless-docker:
     name: Run with rootless docker
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -248,7 +248,7 @@ jobs:
 
   test-podman:
     name: Run with sudo podman 4
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -278,7 +278,7 @@ jobs:
 
   test-rootless-podman:
     name: Run with rootless podman 4
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -308,7 +308,7 @@ jobs:
 
   test-upgrade:
     name: Upgrade from older version or build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -348,7 +348,7 @@ jobs:
 
   test-upgrade-podman:
     name: Upgrade from older version with podman 4
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -410,7 +410,7 @@ jobs:
 
   test-k3s:
     name: Run with K3s with docker
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -446,7 +446,7 @@ jobs:
 
   push-after-success:
     name: Push images to registries
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [ test-docker, test-rootless-docker, test-docker-20-04, test-podman, test-rootless-podman, test-upgrade, test-upgrade-20-04, test-k3s ]
     if: github.event_name != 'pull_request' && github.repository == 'freeipa/freeipa-container' && github.ref == 'refs/heads/master'
     strategy:
