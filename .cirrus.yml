@@ -3,7 +3,7 @@ docker_builder:
   env:
     CIRRUS_ARCH: arm64
     matrix:
-      - os: fedora-39
+      - os: fedora-40
   config_script:
     - groupadd -g 200000 testuser
     - useradd -m -u 200000 -g 200000 testuser
