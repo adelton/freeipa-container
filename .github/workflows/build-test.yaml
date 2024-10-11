@@ -254,10 +254,10 @@ jobs:
           name: freeipa-server-${{ matrix.os }}
       - name: Load image
         run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | podman load
-      - name: Populate volume with data
-        run: podman volume create loaded-data && podman run --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop || true
+      - name: Use image driver to access the data
+        run: podman pull quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} && podman volume create --driver image --opt image=quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} loaded-data
       - name: Copy the content of the volume to directory
-        run: mkdir /tmp/freeipa-data && podman run --volumes-from loaded-data -v /tmp/freeipa-data:/data-out:z --rm docker.io/library/busybox sh -c 'cd /data && cp -a . /data-out'
+        run: mkdir /tmp/freeipa-data && podman run -v loaded-data:/data-in -v /tmp/freeipa-data:/data-out:z --rm docker.io/library/busybox sh -c 'cd /data-in/data && cp -a . /data-out'
       - name: Run master and replica
         run: docker=podman VOLUME=/tmp/freeipa-data replica=none tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
 

@@ -159,7 +159,7 @@ fi
 
 
 fresh_install=true
-if [ -f "$VOLUME/build-id" ] ; then
+if [ -f "$VOLUME/build-id" -o "$VOLUME_POPULATED" == true ] ; then
 	# If we were given already populated volume, just run the container
 	fresh_install=false
 	run_ipa_container $IMAGE freeipa-master exit-on-finished
