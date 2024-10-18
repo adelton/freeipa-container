@@ -20,7 +20,7 @@ set -x
 #
 
 cd "$1"
-podman run --rm -v $(pwd)/data:/data:Z registry.fedoraproject.org/fedora:40 tar cf - data > data.tar
+podman run --rm -v $(pwd)/data:/data:Z docker.io/library/busybox tar cf - -C data . > data.tar
 SUM=$( sha256sum data.tar )
 SUM=${SUM%% *}
 mv data.tar $SUM.tar

@@ -43,8 +43,12 @@ function wait_for_ipa_container() {
 		fi
 	done
 	date
-	if test -O $VOLUME/build-id ; then
+	if test "$VOLUME" == "${VOLUME#/}" ; then
+		sudo="$docker run --rm -v $VOLUME:/$VOLUME docker.io/library/busybox"
+	elif test -O $VOLUME/build-id ; then
 		sudo=
+	else
+		sudo=sudo
 	fi
 	if [ "$EXIT_STATUS" -ne 0 ] ; then
 		exit "$EXIT_STATUS"
@@ -55,7 +59,7 @@ function wait_for_ipa_container() {
 	if $docker diff "$N" | tee /dev/stderr | grep . ; then
 		exit 1
 	fi
-	MACHINE_ID=$( cat $VOLUME/etc/machine-id )
+	MACHINE_ID=$( $sudo cat $VOLUME/etc/machine-id )
 	# Check that journal landed on volume and not in host's /var/log/journal
 	$sudo ls -la $VOLUME/var/log/journal/$MACHINE_ID
 	if [ -e /var/log/journal/$MACHINE_ID ] ; then
@@ -159,7 +163,7 @@ fi
 
 
 fresh_install=true
-if [ -f "$VOLUME/build-id" ] ; then
+if [ -f "$VOLUME/build-id" -o "$VOLUME" == "${VOLUME#/}" ] ; then
 	# If we were given already populated volume, just run the container
 	fresh_install=false
 	run_ipa_container $IMAGE freeipa-master exit-on-finished
