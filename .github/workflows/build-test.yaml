@@ -69,7 +69,7 @@ jobs:
       - id: produce-matrix
         run: |
           (
-          echo -n 'matrix={"os": ['
+          echo -n 'matrix={"os":['
           find result-status -type f | sed "s#.*/##; s/^\|\$/\"/g; \$!s/$/,/" | while read f ; do echo -n " $f" ; done
           echo " ]}"
           ) | tee -a $GITHUB_OUTPUT
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ consolidate ]
     if: |
-      needs.consolidate.outputs.matrixx != '{"os": []}'
+      needs.consolidate.outputs.matrix != '{"os":[]}'
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.consolidate.outputs.matrix) }}
