@@ -1,0 +1,12 @@
+{
+  "os": [
+    "fedora-rawhide",
+    "fedora-40",
+    "fedora-39",
+    "centos-9-stream",
+    "rocky-9",
+    "rocky-8",
+    "almalinux-9",
+    "almalinux-8"
+  ]
+}
