@@ -65,14 +65,16 @@ jobs:
           pattern: result-status-*
           path: result-status
       - run: |
+          find result-status -type f
           find result-status -type f | while read f ; do cat $f ; done
       - id: produce-matrix
         run: |
           (
           echo -n 'matrix={"os":['
-          find result-status -type f | sed "s#.*/##; s/^\|\$/\"/g; \$!s/$/,/" | while read f ; do echo -n " $f" ; done
-          echo " ]}"
-          ) | tee -a $GITHUB_OUTPUT
+          jq -r '.os[]' < .github/workflows/build-test-os.json \
+          | while read f ; do if test -f result-status/result-status-$f/$f ; then echo -n '"'$f'",' ; fi ; done
+          echo "]}"
+          ) | sed 's/,]}/]}/' | tee -a $GITHUB_OUTPUT
 
   push-after-success:
     name: Fake push built images
