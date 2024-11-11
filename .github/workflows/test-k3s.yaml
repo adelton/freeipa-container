@@ -1,0 +1,39 @@
+
+name: Test image on K3s
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Image to run the test with
+        type: string
+      os:
+        description: OS to run the test on
+        type: choice
+        options:
+          - ubuntu-24.04
+          - ubuntu-22.04
+
+jobs:
+  test-k3s:
+    name: Run with K3s with docker
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/docker-cgroups-ubuntu-22
+      - name: Download latest cri-dockerd
+        run: curl -s ${{ github.api_url }}/repos/Mirantis/cri-dockerd/releases/latest | jq -r '.assets[].browser_download_url' | grep jammy_amd64.deb | tee /dev/stderr | xargs curl -LO
+      - name: Install cri-dockerd
+        run: sudo apt install -y ./cri-dockerd_*.deb
+      - name: Unset network-plugin
+        run: |
+          sudo mkdir /etc/systemd/system/cri-docker.service.d
+          ( echo '[Service]' ; echo 'ExecStart=' ; sed 's/ExecStart=.*/& --network-plugin=/;t;d' /lib/systemd/system/cri-docker.service ) | sudo tee /etc/systemd/system/cri-docker.service.d/network-plugin.conf
+          sudo systemctl daemon-reload
+          sudo systemctl restart cri-docker
+      - name: Pull the image
+        run: docker pull ${{ inputs.image }}
+      - name: Run K3s and master in it
+        run: tests/run-master-in-k3s.sh ${{ inputs.image }}
+
