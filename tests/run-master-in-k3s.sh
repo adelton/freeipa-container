@@ -47,6 +47,7 @@ kubectl describe pod/freeipa-server
 PV_DIR=$( kubectl get pvc/freeipa-data-pvc -o 'jsonpath={.spec.volumeName}_{.metadata.namespace}_{.metadata.name}' )
 ls -la /var/lib/rancher/k3s/storage/$PV_DIR
 IPA_SERVER_HOSTNAME=$( kubectl exec pod/freeipa-server -- hostname -f )
+dig +short @$( kubectl get -o=jsonpath='{.spec.clusterIP}' service freeipa-server-service ) $IPA_SERVER_HOSTNAME
 if ! test -f /etc/resolv.conf.backup ; then
 	sudo mv /etc/resolv.conf /etc/resolv.conf.backup
 fi
@@ -74,6 +75,8 @@ kubectl describe pod/freeipa-replica
 PV_DIR=$( kubectl get pvc/freeipa-replica-pvc -o 'jsonpath={.spec.volumeName}_{.metadata.namespace}_{.metadata.name}' )
 ls -la /var/lib/rancher/k3s/storage/$PV_DIR
 IPA_REPLICA_HOSTNAME=$( kubectl exec pod/freeipa-replica -- hostname -f )
+kubectl exec pod/freeipa-replica -- dig +short $IPA_SERVER_HOSTNAME
+kubectl exec pod/freeipa-replica -- dig +short $IPA_REPLICA_HOSTNAME
 curl -Lk https://$IPA_REPLICA_HOSTNAME/ | grep -E 'IPA: Identity Policy Audit|Identity Management'
 curl -H "Referer: https://$IPA_REPLICA_HOSTNAME/ipa/ui/" -H 'Accept-Language: fr' -d '{"method":"i18n_messages","params":[[],{}]}' -k https://$IPA_REPLICA_HOSTNAME/ipa/i18n_messages | grep -q utilisateur
 echo Secret123 | kubectl exec -i pod/freeipa-replica -- kinit admin

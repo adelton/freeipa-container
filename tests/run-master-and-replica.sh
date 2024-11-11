@@ -50,6 +50,11 @@ function wait_for_ipa_container() {
 			if [ "$STATUS" == 'running' ] ; then
 				echo "The container systemctl is-system-running [$STATUS]."
 				EXIT_STATUS=0
+				(
+				set -x
+				HOSTNAME_X=$( $docker exec "$N" hostname -f )
+				$docker exec "$N" dig +short $HOSTNAME_X
+				)
 				break
 			elif [ "$STATUS" == 'degraded' ] ; then
 				echo "The container systemctl is-system-running [$STATUS]."
@@ -183,7 +188,7 @@ fresh_install=true
 if $sudo test -f "$VOLUME/build-id" ; then
 	# If we were given already populated volume, just run the container
 	fresh_install=false
-	run_ipa_container $IMAGE freeipa-master exit-on-finished
+	run_ipa_container $IMAGE freeipa-master
 else
 	# Initial setup of the FreeIPA server
 	dns_opts="--auto-reverse --allow-zone-overlap"
@@ -193,7 +198,7 @@ else
 	if [ "$(id -u)" != 0 -a "$docker" == podman -a "$replica" != none ] ; then
 		dns_opts="$dns_opts --ip-address=172.29.0.1"
 	fi
-	run_ipa_container $IMAGE freeipa-master exit-on-finished -U -r EXAMPLE.TEST --setup-dns --no-forwarders $dns_opts $skip_opts --no-ntp $ca
+	run_ipa_container $IMAGE freeipa-master -U -r EXAMPLE.TEST --setup-dns --no-forwarders $dns_opts $skip_opts --no-ntp $ca
 
 	if [ -n "$ca" ] ; then
 		$docker rm -f freeipa-master
@@ -202,7 +207,7 @@ else
 		$sudo chmod a+x $VOLUME/generate-external-ca.sh
 		$docker run --rm -v $VOLUME:/data:Z --entrypoint /data/generate-external-ca.sh "$IMAGE"
 		# For external CA, provide the certificate for the second stage
-		run_ipa_container $IMAGE freeipa-master exit-on-finished -U -r EXAMPLE.TEST --setup-dns --no-forwarders $skip_opts --no-ntp \
+		run_ipa_container $IMAGE freeipa-master -U -r EXAMPLE.TEST --setup-dns --no-forwarders $skip_opts --no-ntp \
 			--external-cert-file=/data/ipa.crt --external-cert-file=/data/ca.crt
 	fi
 fi
@@ -211,7 +216,7 @@ while [ -n "$1" ] ; do
 	IMAGE="$1"
 	$docker rm -f freeipa-master
 	# Start the already-setup master server, or upgrade to next image
-	run_ipa_container $IMAGE freeipa-master exit-on-finished
+	run_ipa_container $IMAGE freeipa-master
 	shift
 done
 
