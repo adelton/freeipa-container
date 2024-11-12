@@ -95,13 +95,15 @@ spec:
     - containerPort: 88
       protocol: UDP
     env:
+    - name: IPA_SERVER_IP
+      value: 10.43.201.201
     - name: PASSWORD
       valueFrom:
         secretKeyRef:
           name: freeipa-server-password
           key: admin.password
     - name: IPA_SERVER_INSTALL_OPTS
-      value: "-U -r CLUSTER.LOCAL --setup-dns --no-forwarders --no-ntp --ip-address=10.43.201.201"
+      value: "-U -r CLUSTER.LOCAL --setup-dns --no-forwarders --no-ntp"
     readinessProbe:
       exec:
         command: [ "/usr/bin/systemctl", "status", "ipa" ]
@@ -114,10 +116,6 @@ spec:
   dnsConfig:
     nameservers:
       - 127.0.0.1
-  hostAliases:
-  - ip: "10.43.201.201"
-    hostnames:
-    - "freeipa-server.dom1.default.svc.cluster.local"
   subdomain: dom1
   setHostnameAsFQDN: true
   volumes:
