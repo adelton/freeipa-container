@@ -53,7 +53,8 @@ function wait_for_ipa_container() {
 				(
 				set -x
 				HOSTNAME_X=$( $docker exec "$N" hostname -f )
-				$docker exec "$N" dig +short $HOSTNAME_X
+				$docker exec "$N" dig +short $HOSTNAME_X | grep .
+				$docker exec "$N" dig +short -t srv _ldap._tcp.${HOSTNAME_X#*.} | grep .
 				)
 				break
 			elif [ "$STATUS" == 'degraded' ] ; then
