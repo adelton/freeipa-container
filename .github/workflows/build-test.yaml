@@ -61,7 +61,7 @@ jobs:
         shell: bash
 
   master-and-replica:
-    name: Master + replica
+    name: ${{ matrix.data-from == '' && 'Master + replica' || 'Upgrade' }} (${{ join(matrix.*, ', ') }})
     runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
@@ -161,48 +161,7 @@ jobs:
             readonly: --read-only
             runtime: podman
             runs-on: ubuntu-22.04
-    timeout-minutes: 30
-    env:
-      runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/docker-cgroups-ubuntu-22
-        if: matrix.runtime == 'docker' && matrix.runs-on != 'ubuntu-20.04'
-      - run: ls -la /sys/fs/cgroup/unified
-        if: matrix.runtime == 'docker' && matrix.runs-on == 'ubuntu-20.04'
-      - run: sudo systemctl disable --now docker.service docker.socket
-        if: matrix.runtime == 'docker rootless'
-      - run: curl -fsSL https://get.docker.com/rootless | FORCE_ROOTLESS_INSTALL=1 sh
-        if: matrix.runtime == 'docker rootless'
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
-        if: matrix.runtime == 'podman' || matrix.runtime == 'sudo podman'
-      - uses: actions/download-artifact@v4
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | $runtime load
-      - run: $runtime volume create ${{ matrix.volume }}
-        if: matrix.volume == 'freeipa-data'
-      - name: Run master and replica
-        run: docker="$runtime" readonly=${{ matrix.readonly }} ca=${{ matrix.ca }} VOLUME=${{ matrix.volume }} seccomp=${{ matrix.seccomp }} replica=${{ matrix.replica }} tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-      - run: $runtime rm -af
-        if: matrix.runtime == 'podman' || matrix.runtime == 'sudo podman'
-      - name: Show package difference
-        if: failure()
-        run: diff -U 0 <( $runtime run --rm --entrypoint rpm quay.io/freeipa/freeipa-server:${{ matrix.os }} -qa | sort ) <( $runtime run --rm --entrypoint rpm localhost/freeipa-server:${{ matrix.os }} -qa | sort ) || true
-      - name: Run partial tests
-        if: failure()
-        run: docker="$runtime" tests/run-partial-tests.sh Dockerfile.${{ matrix.os }}
 
-  test-upgrade:
-    name: Upgrade from older version or build
-    runs-on: ${{ matrix.runs-on }}
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
           - os: fedora-rawhide
             data-from: fedora-41
             runtime: docker
@@ -237,13 +196,19 @@ jobs:
             data-from: fedora-41
             runtime: docker
             runs-on: ubuntu-20.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
         if: matrix.runtime == 'docker' && matrix.runs-on != 'ubuntu-20.04'
+      - run: ls -la /sys/fs/cgroup/unified
+        if: matrix.runtime == 'docker' && matrix.runs-on == 'ubuntu-20.04'
+      - run: sudo systemctl disable --now docker.service docker.socket
+        if: matrix.runtime == 'docker rootless'
+      - run: curl -fsSL https://get.docker.com/rootless | FORCE_ROOTLESS_INSTALL=1 sh
+        if: matrix.runtime == 'docker rootless'
       - name: Install podman 4.*
         uses: ./.github/actions/install-podman-4
         if: matrix.runtime == 'podman' || matrix.runtime == 'sudo podman'
@@ -252,16 +217,28 @@ jobs:
           name: freeipa-server-${{ matrix.os }}
       - name: Load image
         run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | $runtime load
+      - run: $runtime volume create ${{ matrix.volume }}
+        if: matrix.volume == 'freeipa-data' && matrix.data-from == ''
       - name: Prepare volume with data (docker)
         run: $runtime volume create loaded-data && $runtime create --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop
-        if: matrix.runtime == 'docker' || matrix.runtime == 'docker rootless'
+        if: matrix.data-from != '' && (matrix.runtime == 'docker' || matrix.runtime == 'docker rootless')
       - name: Prepare volume with data (podman)
         run: $runtime volume create loaded-data && $runtime run --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop || true
-        if: matrix.runtime == 'podman' || matrix.runtime == 'sudo podman'
+        if: matrix.data-from != '' && (matrix.runtime == 'podman' || matrix.runtime == 'sudo podman')
       - name: Populate volume directory from volume
         run: mkdir /tmp/freeipa-data && $runtime run --security-opt label=disable --volumes-from loaded-data -v /tmp/freeipa-data:/data-out:z --rm docker.io/library/busybox sh -c 'cd /data && cp -a . /data-out'
+        if: matrix.data-from != ''
+
       - name: Run master and replica
-        run: docker="$runtime" VOLUME=/tmp/freeipa-data tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
+        run: docker="$runtime" readonly=${{ matrix.readonly }} ca=${{ matrix.ca }} VOLUME=${{ matrix.data-from != '' && '/tmp/freeipa-data' || matrix.volume }} seccomp=${{ matrix.seccomp }} replica=${{ matrix.replica }} tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
+      - run: $runtime rm -af
+        if: matrix.runtime == 'podman' || matrix.runtime == 'sudo podman'
+      - name: Show package difference
+        if: failure()
+        run: diff -U 0 <( $runtime run --rm --entrypoint rpm quay.io/freeipa/freeipa-server:${{ matrix.os }} -qa | sort ) <( $runtime run --rm --entrypoint rpm localhost/freeipa-server:${{ matrix.os }} -qa | sort ) || true
+      - name: Run partial tests
+        if: failure()
+        run: docker="$runtime" tests/run-partial-tests.sh Dockerfile.${{ matrix.os }}
 
   test-k3s:
     name: Run with K3s with docker
@@ -296,7 +273,7 @@ jobs:
   push-after-success:
     name: Push images to registries
     runs-on: ubuntu-22.04
-    needs: [ master-and-replica, test-upgrade, test-k3s ]
+    needs: [ master-and-replica, test-k3s ]
     if: github.event_name != 'pull_request' && github.repository == 'freeipa/freeipa-container' && github.ref == 'refs/heads/master'
     strategy:
       fail-fast: false
