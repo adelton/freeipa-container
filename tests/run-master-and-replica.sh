@@ -250,6 +250,9 @@ for i in $( seq 1 20 ) ; do
 done
 (
 set -x
+$docker exec freeipa-master cat /etc/resolv.conf
+$docker exec freeipa-master dig ipa.example.test
+
 $docker exec freeipa-master bash -c 'yes Secret123 | kinit admin'
 $docker exec freeipa-master ipa user-add --first Bob --last Nowak bob$$
 $docker exec freeipa-master id bob$$
@@ -277,6 +280,8 @@ if [ $(( $RANDOM % 2 )) == 0 ] ; then
 	SETUP_CA=
 fi
 run_ipa_container $IMAGE freeipa-replica no-exit ipa-replica-install -U --principal admin $SETUP_CA $skip_opts --no-ntp
+$docker exec freeipa-replica cat /etc/resolv.conf
+$docker exec freeipa-replica dig ipa.example.test
 date
 if $docker diff freeipa-master | tee /dev/stderr | grep . ; then
 	exit 1
