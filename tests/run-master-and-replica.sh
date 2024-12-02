@@ -145,25 +145,13 @@ if [ "$(id -u)" != 0 -a "$docker" == podman -a "$replica" != none ] ; then
 	# cleanup of potential previous runs
 	podman pod rm -f $BASE-master 2> /dev/null || :
 	podman pod rm -f $BASE-replica 2> /dev/null || :
-	sudo ip link del $BASE-master 2> /dev/null || :
-	sudo ip link del $BASE-replica 2> /dev/null || :
-	sudo ip netns del $BASE-master 2> /dev/null || :
-	sudo ip netns del $BASE-replica 2> /dev/null || :
 	# create link
-	sudo ip link add $BASE-master type veth peer name $BASE-replica
-	# create and start pods to get their host pids; not running containers in them yet
-	podman pod create --name $BASE-master --hostname ipa.example.test --add-host ipa.example.test:172.29.0.1 --dns=127.0.0.1
-	podman pod create --name $BASE-replica --hostname replica.example.test --dns=172.29.0.1
+	# sudo ip link add $BASE-master type veth peer name $BASE-replica
+	# create and start pods to tweak the network; not running containers in them yet
+	podman pod create --name $BASE-master --hostname ipa.example.test --add-host ipa.example.test:10.88.17.2 --dns=127.0.0.1 --network=bridge:ip=10.88.17.2
+	podman pod create --name $BASE-replica --hostname replica.example.test --dns=10.88.17.2 --network=bridge:ip=10.88.17.3
 	podman pod start $BASE-master
-	podman pod top $BASE-master hpid | grep -v ^HPID | xargs sudo ip netns attach $BASE-master
-	sudo ip link set $BASE-master netns $BASE-master
-	sudo ip netns exec $BASE-master ip link set dev $BASE-master up
-	sudo ip netns exec $BASE-master ip addr add 172.29.0.1/24 dev $BASE-master
 	podman pod start $BASE-replica
-	podman pod top $BASE-replica hpid | grep -v ^HPID | xargs sudo ip netns attach $BASE-replica
-	sudo ip link set $BASE-replica netns $BASE-replica
-	sudo ip netns exec $BASE-replica ip link set dev $BASE-replica up
-	sudo ip netns exec $BASE-replica ip addr add 172.29.0.2/24 dev $BASE-replica
 elif [ "$readonly" == "--read-only" ] ; then
 	readonly_run="$readonly --dns=127.0.0.1"
 fi
@@ -191,7 +179,7 @@ else
 		dns_opts=""
 	fi
 	if [ "$(id -u)" != 0 -a "$docker" == podman -a "$replica" != none ] ; then
-		dns_opts="$dns_opts --ip-address=172.29.0.1"
+		dns_opts="$dns_opts --ip-address=10.88.17.2"
 	fi
 	run_ipa_container $IMAGE freeipa-master exit-on-finished -U -r EXAMPLE.TEST --setup-dns --no-forwarders $dns_opts $skip_opts --no-ntp $ca
 
