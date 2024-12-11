@@ -127,14 +127,9 @@ function run_ipa_container() {
 		OPTS="$OPTS --security-opt seccomp=$seccomp"
 	fi
 	if [ "$(id -u)" != 0 -a "$docker" == podman -a "$replica" != none ] ; then
-		if [ "$N" == "freeipa-master" ] ; then
-			OPTS="$OPTS --pod=$BASE-master"
-		else
-			OPTS="$OPTS --pod=$BASE-replica"
-		fi
-	else
-		OPTS="$OPTS -h $HOSTNAME"
+		OPTS="$OPTS --network=bridge"
 	fi
+	OPTS="$OPTS -h $HOSTNAME"
 	(
 	set -x
 	umask 0
@@ -150,27 +145,26 @@ IMAGE="$1"
 readonly_run="$readonly"
 if [ "$(id -u)" != 0 -a "$docker" == podman -a "$replica" != none ] ; then
 	# cleanup of potential previous runs
-	podman pod rm -f $BASE-master 2> /dev/null || :
-	podman pod rm -f $BASE-replica 2> /dev/null || :
-	sudo ip link del $BASE-master 2> /dev/null || :
-	sudo ip link del $BASE-replica 2> /dev/null || :
-	sudo ip netns del $BASE-master 2> /dev/null || :
-	sudo ip netns del $BASE-replica 2> /dev/null || :
-	# create link
-	sudo ip link add $BASE-master type veth peer name $BASE-replica
-	# create and start pods to get their host pids; not running containers in them yet
-	podman pod create --name $BASE-master --hostname ipa.example.test --add-host ipa.example.test:172.29.0.1 --dns=127.0.0.1
-	podman pod create --name $BASE-replica --hostname replica.example.test --dns=172.29.0.1
-	podman pod start $BASE-master
-	podman pod top $BASE-master hpid | grep -v ^HPID | xargs sudo ip netns attach $BASE-master
-	sudo ip link set $BASE-master netns $BASE-master
-	sudo ip netns exec $BASE-master ip link set dev $BASE-master up
-	sudo ip netns exec $BASE-master ip addr add 172.29.0.1/24 dev $BASE-master
-	podman pod start $BASE-replica
-	podman pod top $BASE-replica hpid | grep -v ^HPID | xargs sudo ip netns attach $BASE-replica
-	sudo ip link set $BASE-replica netns $BASE-replica
-	sudo ip netns exec $BASE-replica ip link set dev $BASE-replica up
-	sudo ip netns exec $BASE-replica ip addr add 172.29.0.2/24 dev $BASE-replica
+	sudo ip link set $BASE-ingress netns $BASE-ingress-pod name eth0 2> /dev/null || :
+	podman pod rm -f $BASE-ingress 2> /dev/null || :
+	sudo ip netns | grep "^$BASE-ingress-" | while read i ; do sudo ip netns del $i ; done
+
+	# create pod in bridge
+	podman pod create --name $BASE-ingress --infra-name $BASE-ingress-infra --network bridge
+	podman pod start $BASE-ingress
+	INFRA_PID=$( podman inspect $BASE-ingress-infra | jq -r '.[0].PidFile' )
+	test -n "$INFRA_PID"
+	INFRA_PID=$( cat $INFRA_PID )
+	test -n "$INFRA_PID"
+	INFRA_IP=$( podman inspect $BASE-ingress-infra | jq -r '.[0].NetworkSettings | .IPAddress + "/" + (.IPPrefixLen | tostring)' )
+	test -n "$INFRA_IP"
+
+	sudo ip netns attach $BASE-ingress-host 1
+	sudo ip netns attach $BASE-ingress-pod $INFRA_PID
+
+	# move the interface to the bridge to the host
+	sudo ip -n $BASE-ingress-pod link set eth0 name $BASE-ingress netns $BASE-ingress-host up
+	sudo ip addr add $INFRA_IP dev $BASE-ingress
 elif [ "$readonly" == "--read-only" ] ; then
 	readonly_run="$readonly --dns=127.0.0.1"
 fi
@@ -196,9 +190,6 @@ else
 	dns_opts="--auto-reverse --allow-zone-overlap"
 	if [ "$replica" = 'none' ] ; then
 		dns_opts=""
-	fi
-	if [ "$(id -u)" != 0 -a "$docker" == podman -a "$replica" != none ] ; then
-		dns_opts="$dns_opts --ip-address=172.29.0.1"
 	fi
 	run_ipa_container $IMAGE freeipa-master exit-on-finished -U -r EXAMPLE.TEST --setup-dns --no-forwarders $dns_opts $skip_opts --no-ntp $ca
 
