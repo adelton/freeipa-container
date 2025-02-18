@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build image
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     strategy:
       fail-fast: false
       matrix:
@@ -62,7 +62,7 @@ jobs:
 
   test-docker:
     name: Run with docker
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -109,7 +109,7 @@ jobs:
 
   test-rootless-docker:
     name: Run with rootless docker
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -157,7 +157,7 @@ jobs:
 
   test-podman:
     name: Run with sudo podman 4
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -179,7 +179,7 @@ jobs:
 
   test-rootless-podman:
     name: Run with rootless podman 4
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -211,7 +211,7 @@ jobs:
 
   test-rootless-podman-22-04:
     name: Run with rootless podman 4 on Ubuntu 22.04
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04-arm
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -245,7 +245,7 @@ jobs:
 
   test-upgrade:
     name: Upgrade from older version or build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -277,7 +277,7 @@ jobs:
 
   test-upgrade-podman:
     name: Upgrade from older version with podman 4
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -304,7 +304,7 @@ jobs:
 
   test-k3s:
     name: Run with K3s with docker
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     needs: [ build ]
     strategy:
       fail-fast: false
@@ -322,48 +322,6 @@ jobs:
       - name: Run K3s and master in it
         run: tests/run-master-in-k3s.sh localhost/freeipa-server:${{ matrix.os }}
 
-  push-after-success:
-    name: Push images to registries
-    runs-on: ubuntu-24.04
-    needs: [ test-docker, test-rootless-docker, test-podman, test-rootless-podman, test-rootless-podman-22-04, test-upgrade, test-k3s ]
-    if: github.event_name != 'pull_request' && github.repository == 'freeipa/freeipa-container' && github.ref == 'refs/heads/master'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ fedora-rawhide, fedora-41, fedora-40, centos-9-stream, rocky-9, rocky-8, almalinux-9, almalinux-8 ]
-    timeout-minutes: 30
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Prepare authentication file
-        run: |
-          cat > auth.json << 'EOF'
-          ${{ secrets.REGISTRY_CREDENTIALS_FILE }}
-          EOF
-      - name: Copy ${{ matrix.os }} to registries
-        run: |
-          set -e
-          f=docker-archive:freeipa-server-${{ matrix.os }}.tar.gz
-          while read r ; do
-            if cmp \
-              <( skopeo inspect $r:${{ matrix.os }} \
-                | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) \
-              <( skopeo inspect $f \
-                | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) ; then
-              echo Built freeipa-server:${{ matrix.os }} is the same as image at ${r#docker://}, not pushing
-              continue
-            fi
-            echo Copying freeipa-server:${{ matrix.os }} to ${r#docker://}
-            skopeo copy --authfile=auth.json $f $r:${{ matrix.os }}
-            VERSION=$( skopeo inspect --format='{{index .Labels "org.opencontainers.image.version"}}' $f | sed 's/-.*//' )
-            test -n "$VERSION"
-            skopeo copy --authfile=auth.json $r:${{ matrix.os }} $r:${{ matrix.os }}-$VERSION
-            echo Tagged as ${{ matrix.os }}-$VERSION as well
-          done << 'EOF'
-          ${{ secrets.REGISTRY_TARGET_LIST }}
-          EOF
-
   test-subscription:
     # Workaround https://github.com/actions/runner/issues/1138
     name: Prerequisite for RHEL builds
@@ -380,7 +338,7 @@ jobs:
 
   build-test-rhel-podman:
     name: Build and test RHEL image
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     needs: [ test-subscription ]
     if: needs.test-subscription.outputs.has_rhel_subscriptions == 1
     strategy:
