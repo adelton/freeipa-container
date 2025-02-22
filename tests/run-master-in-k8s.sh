@@ -35,8 +35,7 @@ sudo swapoff -a
 sudo modprobe br_netfilter
 sudo sysctl -w net.ipv4.ip_forward=1
 
-# Match the service cidr to the K3s defaults: https://docs.k3s.io/cli/server
-if ! sudo kubeadm init --cri-socket unix:///var/run/crio/crio.sock --service-cidr 10.43.0.0/16 ; then
+if ! sudo kubeadm init --config tests/k8s-userns-config.yaml ; then
 	set +e
 	sudo systemctl status kubelet
 	sudo journalctl -xeu kubelet
