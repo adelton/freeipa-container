@@ -60,6 +60,24 @@ jobs:
           diff -u <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq '.Labels' ) <( skopeo inspect docker-archive:freeipa-server-${{ matrix.os }}/freeipa-server-${{ matrix.os }}.tar.gz | jq '.Labels' ) || true
         shell: bash
 
+  test-k8s:
+    name: Run with K8s with CRI-O
+    runs-on: ${{ matrix.runs-on }}
+    needs: [ build ]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ fedora-rawhide, fedora-41, rocky-9, almalinux-8, centos-9-stream ]
+        runs-on: [ ubuntu-24.04, ubuntu-22.04 ]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: freeipa-server-${{ matrix.os }}
+      - name: Run K3s and master in it
+        run: tests/run-master-in-k8s.sh localhost/freeipa-server:${{ matrix.os }} freeipa-server-${{ matrix.os }}.tar.gz
+
   test-k3s:
     name: Run with K3s with docker
     runs-on: ${{ matrix.runs-on }}
