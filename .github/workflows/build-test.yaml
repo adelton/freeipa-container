@@ -302,6 +302,23 @@ jobs:
       - name: Run master and replica
         run: docker=podman VOLUME=/tmp/freeipa-data tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
 
+  test-k8s:
+    name: Run with K8s with CRI-O
+    runs-on: ubuntu-24.04
+    needs: [ build ]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ fedora-rawhide, fedora-41, rocky-9, almalinux-8, centos-9-stream ]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: freeipa-server-${{ matrix.os }}
+      - name: Run K3s and master in it
+        run: tests/run-master-in-k8s.sh localhost/freeipa-server:${{ matrix.os }} freeipa-server-${{ matrix.os }}.tar.gz
+
   test-k3s:
     name: Run with K3s with docker
     runs-on: ubuntu-24.04
@@ -325,7 +342,7 @@ jobs:
   push-after-success:
     name: Push images to registries
     runs-on: ubuntu-24.04
-    needs: [ test-docker, test-rootless-docker, test-podman, test-rootless-podman, test-rootless-podman-22-04, test-upgrade, test-k3s ]
+    needs: [ test-docker, test-rootless-docker, test-podman, test-rootless-podman, test-rootless-podman-22-04, test-upgrade, test-k8s, test-k3s ]
     if: github.event_name != 'pull_request' && github.repository == 'freeipa/freeipa-container' && github.ref == 'refs/heads/master'
     strategy:
       fail-fast: false
