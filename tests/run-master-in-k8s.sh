@@ -36,8 +36,7 @@ sudo modprobe br_netfilter
 sudo sysctl -w net.ipv4.ip_forward=1
 sudo sudo iptables -A FORWARD -o cni0 -j ACCEPT
 
-# Match the service cidr to the K3s defaults: https://docs.k3s.io/cli/server
-if ! sudo kubeadm init --cri-socket unix:///var/run/crio/crio.sock --service-cidr 10.43.0.0/16 ; then
+if ! sudo kubeadm init --config tests/k8s-userns-config.yaml ; then
 	set +e
 	sudo systemctl status kubelet
 	sudo journalctl -xeu kubelet
@@ -81,6 +80,7 @@ MASTER_LOGS_PID=$!
 trap "kill $MASTER_LOGS_PID 2> /dev/null || : ; trap - EXIT" EXIT
 ( set +x ; while true ; do if kubectl get pod/freeipa-server | grep -q '\b1/1\b' ; then kill $MASTER_LOGS_PID ; break ; else sleep 5 ; fi ; done )
 kubectl describe pod/freeipa-server
+ps axuwwf | grep /usr/sbin/init | grep -v grep | grep -v '^root' | grep .
 PV_DIR=$( kubectl get pvc/freeipa-data-pvc -o 'jsonpath={.spec.volumeName}_{.metadata.namespace}_{.metadata.name}' )
 ls -la /opt/local-path-provisioner/$PV_DIR
 IPA_SERVER_HOSTNAME=$( kubectl exec pod/freeipa-server -- hostname -f )
