@@ -59,6 +59,10 @@ fi
 kubectl get pods --all-namespaces
 ( set +x ; while ! kubectl get serviceaccount/default ; do sleep 5 ; done )
 
+# Remove the extremely permissive ACLs / mask that GitHub runners have on /opt
+sudo mkdir /opt/local-path-provisioner
+sudo setfacl -b /opt/local-path-provisioner
+
 # Make local-path provisioner on userns remapped docker setup on cgroups v2 work
 # -- the pods of the cluster run remapped as well
 ### sudo mkdir -p /var/lib/rancher/k3s/storage
