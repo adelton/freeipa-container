@@ -126,3 +126,8 @@ kill $REPLICA_LOGS_PID 2> /dev/null || :
 trap - EXIT
 
 echo OK $0.
+
+if [ -f /etc/resolv.conf.backup ] ; then
+	sudo mv /etc/resolv.conf.backup /etc/resolv.conf
+fi
+sudo systemctl start systemd-resolved.service || :
