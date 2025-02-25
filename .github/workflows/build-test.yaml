@@ -10,16 +10,18 @@ on:
 jobs:
   build:
     name: Build image
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ ubuntu-24.04, ubuntu-24.04-arm ]
         os: [ fedora-rawhide, fedora-41, fedora-40, centos-9-stream, rocky-9, rocky-8, almalinux-9, almalinux-8 ]
         docker: [ docker ]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-podman-arm
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
       - name: Separate git work tree with just the files needed for build
         run: git worktree add --no-checkout ../minimize-for-build
       - name: Populate with the Dockerfile
@@ -63,11 +65,12 @@ jobs:
 
   test-docker:
     name: Run with docker
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
         include:
           - os: fedora-41
           - os: fedora-41
@@ -92,6 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-podman-arm
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
       - uses: actions/download-artifact@v4
         with:
@@ -111,11 +115,12 @@ jobs:
 
   test-rootless-docker:
     name: Run with rootless docker
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
         include:
           - os: fedora-rawhide
             readonly: --read-only
@@ -131,6 +136,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-podman-arm
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
       - run: sudo systemctl disable --now docker.service docker.socket
       - run: |
           cat <<EOT | sudo tee "/etc/apparmor.d/home.runner.bin.rootlesskit"
@@ -160,16 +166,18 @@ jobs:
 
   test-podman:
     name: Run with sudo podman 4
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
         os: [ fedora-41, centos-9-stream ]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-podman-arm
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
       - uses: actions/download-artifact@v4
         with:
           name: freeipa-server-${{ matrix.os }}
@@ -183,11 +191,12 @@ jobs:
 
   test-rootless-podman:
     name: Run with rootless podman 4
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
         include:
           - os: fedora-41
             readonly: --read-only
@@ -201,6 +210,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-podman-arm
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
       - uses: actions/download-artifact@v4
         with:
           name: freeipa-server-${{ matrix.os }}
@@ -216,11 +226,12 @@ jobs:
 
   test-rootless-podman-22-04:
     name: Run with rootless podman 4 on Ubuntu 22.04
-    runs-on: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
         include:
           - os: fedora-rawhide
             readonly: --read-only
@@ -250,11 +261,12 @@ jobs:
 
   test-upgrade:
     name: Upgrade from older version or build
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
         include:
           - os: fedora-rawhide
             data-from: fedora-41
@@ -270,6 +282,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-podman-arm
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
       - uses: actions/download-artifact@v4
         with:
@@ -283,11 +296,12 @@ jobs:
 
   test-upgrade-podman:
     name: Upgrade from older version with podman 4
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
         include:
           - os: fedora-41
             data-from: fedora-40
@@ -297,6 +311,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-podman-arm
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
       - uses: actions/download-artifact@v4
         with:
           name: freeipa-server-${{ matrix.os }}
@@ -311,16 +326,18 @@ jobs:
 
   test-k3s:
     name: Run with K3s with docker
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
         os: [ fedora-rawhide, fedora-41, rocky-9, almalinux-8, centos-9-stream ]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-podman-arm
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
       - uses: actions/download-artifact@v4
         with:
@@ -346,17 +363,19 @@ jobs:
 
   build-test-rhel-podman:
     name: Build and test RHEL image
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     needs: [ test-subscription ]
     if: needs.test-subscription.outputs.has_rhel_subscriptions == 1
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
         os: [ rhel-9, rhel-8 ]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-podman-arm
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
       - name: For RHEL builds, use entitlements
         uses: ./.github/actions/podman-entitlement
         with:
@@ -366,4 +385,3 @@ jobs:
         run: podman build -t localhost/freeipa-server:${{ matrix.os }} -f Dockerfile.${{ matrix.os }} .
       - name: Run master
         run: docker=podman tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-
