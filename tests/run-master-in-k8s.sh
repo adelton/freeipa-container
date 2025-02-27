@@ -60,6 +60,8 @@ kubectl get pods --all-namespaces
 sudo resolvectl dns cni0 $( kubectl get -n kube-system service/kube-dns -o 'jsonpath={.spec.clusterIP}' )
 sudo resolvectl domain cni0 cluster.local
 
+kubectl apply -f tests/freeipa-coredns-custom.yaml
+
 # Remove the extremely permissive ACLs / mask that GitHub runners have on /opt
 sudo mkdir /opt/local-path-provisioner
 sudo setfacl -b /opt/local-path-provisioner
