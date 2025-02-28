@@ -61,6 +61,12 @@ sudo resolvectl dns cni0 $( kubectl get -n kube-system service/kube-dns -o 'json
 sudo resolvectl domain cni0 cluster.local
 
 kubectl apply -f tests/freeipa-coredns-custom.yaml
+if ! kubectl get configmap -n kube-system coredns -o yaml | grep -F 'import /etc/coredns/custom/*.server' ; then
+	( kubectl get configmap -n kube-system coredns -o=jsonpath='{.data.Corefile}'
+	kubectl get configmap -n kube-system coredns-custom -o=jsonpath="{.data['freeipa\.server']}" ) \
+	| kubectl create --dry-run=client -n kube-system configmap coredns --from-file=Corefile=/dev/stdin -o yaml \
+	| kubectl apply -n kube-system -f -
+fi
 
 # Remove the extremely permissive ACLs / mask that GitHub runners have on /opt
 sudo mkdir /opt/local-path-provisioner
