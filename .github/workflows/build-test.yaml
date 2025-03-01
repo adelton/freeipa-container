@@ -60,8 +60,8 @@ jobs:
           diff -u <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq '.Labels' ) <( skopeo inspect docker-archive:freeipa-server-${{ matrix.os }}/freeipa-server-${{ matrix.os }}.tar.gz | jq '.Labels' ) || true
         shell: bash
 
-  test-k8s:
-    name: Run with K8s with CRI-O
+  test-k8s-crio:
+    name: Run in Kubernetes with CRI-O
     runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
@@ -70,16 +70,48 @@ jobs:
         os: [ fedora-41 ]
         runs-on: [ ubuntu-24.04, ubuntu-22.04 ]
     timeout-minutes: 30
+    env:
+      CRIO_VERSION: v1.32
     steps:
       - uses: actions/checkout@v4
+      - run: test -f /sys/fs/cgroup/cgroup.controllers
+      - uses: ./.github/actions/install-crio
+      - uses: ./.github/actions/install-k8s
       - uses: actions/download-artifact@v4
         with:
           name: freeipa-server-${{ matrix.os }}
-      - name: Run K3s and master in it
-        run: tests/run-master-in-k8s.sh localhost/freeipa-server:${{ matrix.os }} freeipa-server-${{ matrix.os }}.tar.gz
+      - run: sudo apt install -y skopeo
+      - run: sudo skopeo copy docker-archive:freeipa-server-${{ matrix.os }}.tar.gz containers-storage:localhost/freeipa-server:${{ matrix.os }}
+      - name: Run master and replica in Kubernetes
+        run: tests/run-in-k8s.sh localhost/freeipa-server:${{ matrix.os }}
 
-  test-k3s:
-    name: Run with K3s with docker
+  test-k3s-crio:
+    name: Run in K3s with CRI-O
+    runs-on: ${{ matrix.runs-on }}
+    needs: [ build ]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ fedora-41 ]
+        runs-on: [ ubuntu-24.04, ubuntu-22.04 ]
+    timeout-minutes: 30
+    env:
+      CRIO_VERSION: v1.32
+    steps:
+      - uses: actions/checkout@v4
+      - run: test -f /sys/fs/cgroup/cgroup.controllers
+      - uses: ./.github/actions/install-crio
+      - uses: ./.github/actions/install-k3s
+      - uses: actions/download-artifact@v4
+        with:
+          name: freeipa-server-${{ matrix.os }}
+      - run: sudo apt install -y skopeo
+      - run: sudo skopeo copy docker-archive:freeipa-server-${{ matrix.os }}.tar.gz containers-storage:localhost/freeipa-server:${{ matrix.os }}
+      - name: Run master and replica in Kubernetes
+        run: tests/run-in-k8s.sh localhost/freeipa-server:${{ matrix.os }}
+
+  test-k3s-docker:
+    name: Run in K3s with docker
     runs-on: ${{ matrix.runs-on }}
     needs: [ build ]
     strategy:
@@ -90,12 +122,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - run: test -f /sys/fs/cgroup/cgroup.controllers
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
+      - uses: ./.github/actions/install-k3s
       - uses: actions/download-artifact@v4
         with:
           name: freeipa-server-${{ matrix.os }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | docker load
-      - name: Run K3s and master in it
-        run: tests/run-master-in-k3s.sh localhost/freeipa-server:${{ matrix.os }}
+      - run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | docker load
+      - run: patch tests/freeipa-k3s.yaml < tests/freeipa-k3s.yaml.docker.patch
+      - run: patch tests/freeipa-replica-k3s.yaml < tests/freeipa-k3s.yaml.docker.patch
+      - name: Run master and replica in Kubernetes
+        run: tests/run-in-k8s.sh localhost/freeipa-server:${{ matrix.os }}
 
