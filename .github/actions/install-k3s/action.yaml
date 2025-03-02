@@ -7,6 +7,11 @@ runs:
         OPTS="--docker --kubelet-arg=allowed-unsafe-sysctls=net.ipv6.conf.all.disable_ipv6"
         if [ -e /var/run/crio/crio.sock ] ; then
             OPTS="--container-runtime-endpoint /var/run/crio/crio.sock"
+            if ! [ -e /opt/cni/bin/bridge ] ; then
+                sudo apt install -y containernetworking-plugins
+                ( echo '[crio.network]' ; echo 'plugin_dir = "/usr/lib/cni"' ) | sudo tee /etc/crio/crio.conf.d/20-cni.conf
+                sudo systemctl restart crio
+            fi
         fi
         curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig ~/.kube/config $OPTS
         sudo chown $( id -u ):$( id -g ) ~/.kube/config
