@@ -101,7 +101,6 @@ jobs:
       - uses: actions/checkout@v4
       - run: test -f /sys/fs/cgroup/cgroup.controllers
       - uses: ./.github/actions/install-crio
-      - uses: lhotari/action-upterm@v1
       - uses: ./.github/actions/install-k3s
       - uses: actions/download-artifact@v4
         with:
