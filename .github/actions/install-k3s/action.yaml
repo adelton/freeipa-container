@@ -3,6 +3,7 @@ runs:
   using: composite
   steps:
     - run: |
+        export INSTALL_K3S_EXEC
         if [ -e /var/run/crio/crio.sock ] ; then
             INSTALL_K3S_EXEC="--container-runtime-endpoint /var/run/crio/crio.sock \
                   --kubelet-arg feature-gates=UserNamespacesSupport=true \
