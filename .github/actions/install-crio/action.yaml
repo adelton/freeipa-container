@@ -9,8 +9,14 @@ runs:
         echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/stable:/$CRIO_VERSION/deb/ /" \
             | sudo tee /etc/apt/sources.list.d/cri-o.list
 
+        KUBERNETES_VERSION=${KUBERNETES_VERSION:-$CRIO_VERSION}
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key \
+            | gpg --dearmor | sudo tee /etc/apt/keyrings/kubernetes-apt-keyring.gpg > /dev/null
+        echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" \
+            | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
         sudo apt update
-        sudo apt install -y cri-o
+        sudo apt install -y cri-o kubernetes-cni
 
         sudo cp /etc/cni/net.d/10-crio-bridge.conflist.disabled /etc/cni/net.d/10-crio-bridge.conflist
         sudo systemctl start crio.service
