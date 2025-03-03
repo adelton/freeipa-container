@@ -17,9 +17,13 @@ trap "kill $MASTER_LOGS_PID 2> /dev/null || : ; trap - EXIT" EXIT
 ( set +x ; while true ; do if kubectl get pod/freeipa-server | grep -q '\b1/1\b' ; then kill $MASTER_LOGS_PID ; break ; else sleep 5 ; fi ; done )
 kubectl describe pod/freeipa-server
 kubectl exec freeipa-server -- cat /proc/1/uid_map | tee /dev/stderr | grep -q '^ *0 *[1-9]'
-PV_DIR=$( kubectl get pvc/freeipa-data-pvc -o 'jsonpath={.spec.volumeName}_{.metadata.namespace}_{.metadata.name}' )
-LOCAL_PATH_DIR=$( kubectl get -n kube-system configmap/local-path-config -o jsonpath="{.data['config\.json']}" \
+LOCAL_PATH_NS=
+for ns in local-path-storage kube-system ; do
+	if kubectl get -n $ns configmap/local-path-config ; then LOCAL_PATH_NS=$ns ; fi
+done
+LOCAL_PATH_DIR=$( kubectl get -n $LOCAL_PATH_NS configmap/local-path-config -o jsonpath="{.data['config\.json']}" \
 	| jq -r '.nodePathMap[] | select(.node == "DEFAULT_PATH_FOR_NON_LISTED_NODES").paths[0]' )
+PV_DIR=$( kubectl get pvc/freeipa-data-pvc -o 'jsonpath={.spec.volumeName}_{.metadata.namespace}_{.metadata.name}' )
 ls -la $LOCAL_PATH_DIR/$PV_DIR
 IPA_SERVER_HOSTNAME=$( kubectl exec pod/freeipa-server -- hostname -f )
 IPA_SERVER_IP=$( kubectl get -o=jsonpath='{.spec.clusterIP}' service freeipa-server-service )
