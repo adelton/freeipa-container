@@ -6,7 +6,11 @@ runs:
         mkdir ~/.kube
         OPTS=''
         if [ -e /var/run/crio/crio.sock ] ; then
-            OPTS="--container-runtime-endpoint /var/run/crio/crio.sock"
+            OPTS="--container-runtime-endpoint /var/run/crio/crio.sock \
+                  --kubelet-arg feature-gates=UserNamespacesSupport=true \
+                  --kube-apiserver-arg feature-gates=UserNamespacesSupport=true \
+                  --kube-controller-manager-arg feature-gates=UserNamespacesSupport=true \
+                  --kube-scheduler-arg feature-gates=UserNamespacesSupport=true"
             if ! [ -e /opt/cni/bin/bridge ] ; then
                 sudo apt install -y containernetworking-plugins
                 ( echo '[crio.network]' ; echo 'plugin_dir = "/usr/lib/cni"' ) | sudo tee /etc/crio/crio.conf.d/20-cni.conf
