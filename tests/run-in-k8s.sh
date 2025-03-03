@@ -18,7 +18,7 @@ trap "kill $MASTER_LOGS_PID 2> /dev/null || : ; trap - EXIT" EXIT
 kubectl describe pod/freeipa-server
 kubectl exec freeipa-server -- cat /proc/1/uid_map | tee /dev/stderr | grep -q '^ *0 *[1-9]'
 PV_DIR=$( kubectl get pvc/freeipa-data-pvc -o 'jsonpath={.spec.volumeName}_{.metadata.namespace}_{.metadata.name}' )
-LOCAL_PATH_DIR=$( kubectl get -n kube-system configmap/local-path-config -o jsonpath="{.data['config\.json']}"
+LOCAL_PATH_DIR=$( kubectl get -n kube-system configmap/local-path-config -o jsonpath="{.data['config\.json']}" \
 	| jq -r '.nodePathMap[] | select(.node == "DEFAULT_PATH_FOR_NON_LISTED_NODES").paths[0]' )
 ls -la $LOCAL_PATH_DIR/$PV_DIR
 IPA_SERVER_HOSTNAME=$( kubectl exec pod/freeipa-server -- hostname -f )
