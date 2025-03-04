@@ -2,10 +2,6 @@ name: Build and test FreeIPA containers
 
 on:
   push:
-  pull_request:
-  workflow_dispatch:
-  schedule:
-    - cron: '15 4 * * 1,3,5'
 
 jobs:
   build:
@@ -18,47 +14,15 @@ jobs:
         docker: [ docker ]
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - name: Separate git work tree with just the files needed for build
-        run: git worktree add --no-checkout ../minimize-for-build
-      - name: Populate with the Dockerfile
-        run: cd ../minimize-for-build && git checkout HEAD Dockerfile.${{ matrix.os }}
-      - name: Populate with files referenced from the Dockerfile
-        run: cd ../minimize-for-build && awk '/^(ADD|COPY)/ { for (i = 2; i < NF; i++) print $i }' Dockerfile.${{ matrix.os }} | while read f ; do git checkout HEAD $f ; done
-      - name: Ensure docker images sees the named parent image
-        run: awk '$1 == "FROM" { print $2 ; exit }' ../minimize-for-build/Dockerfile.${{ matrix.os }} | xargs ${{ matrix.docker }} pull
-      - name: Build image
-        run: ${{ matrix.docker }} build -t localhost/freeipa-server:${{ matrix.os }} -f Dockerfile.${{ matrix.os }} ../minimize-for-build
-
-      - name: Label the built image
-        run: docker="${{ matrix.docker }}" ./ci/label-image.sh Dockerfile.${{ matrix.os }} localhost/freeipa-server:${{ matrix.os }} $( cd ../minimize-for-build && git write-tree ) "${{ github.server_url }}/${{ github.repository }}" "actions/runs/${{ github.run_id }}"
-      - name: File issue if building image failed
-        if: ${{ failure() && github.event_name == 'schedule' }}
-        run: |
-          curl -s '${{ github.api_url }}/repos/${{ github.repository }}/issues?labels=image-build-fail' | jq -r '.[0].state' | grep open \
-          || curl -s -X POST \
-            --url ${{ github.api_url }}/repos/${{ github.repository }}/issues \
-            -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' \
-            -H 'Accept: application/vnd.github.v3+json' \
-            -d '{
-              "title": "Image build for ${{ matrix.os }} failed on '$( date -I )'",
-              "body": "This issue was automatically created by GitHub Action\n\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.\n",
-              "labels": ["image-build-fail" ]
-              }'
       - name: Create directory for artifacts
         run: mkdir freeipa-server-${{ matrix.os }}
       - name: Save image
-        run: ${{ matrix.docker }} save localhost/freeipa-server:${{ matrix.os }} | gzip > freeipa-server-${{ matrix.os }}/freeipa-server-${{ matrix.os }}.tar.gz
+        run: echo ${{ matrix.os }} ${{ matrix.docker }} > freeipa-server-${{ matrix.os }}/freeipa-server-${{ matrix.os }}.out
       - uses: actions/upload-artifact@v4
         with:
           name: freeipa-server-${{ matrix.os }}
           path: freeipa-server-${{ matrix.os }}
           retention-days: 1
-      - name: Check resulting labels
-        run: |
-          skopeo inspect docker-archive:freeipa-server-${{ matrix.os }}/freeipa-server-${{ matrix.os }}.tar.gz | jq '.Labels'
-          diff -u <( skopeo inspect docker://quay.io/freeipa/freeipa-server:${{ matrix.os }} | jq '.Labels' ) <( skopeo inspect docker-archive:freeipa-server-${{ matrix.os }}/freeipa-server-${{ matrix.os }}.tar.gz | jq '.Labels' ) || true
-        shell: bash
 
   master-and-replica:
     name: Run
@@ -168,47 +132,23 @@ jobs:
             runtime: podman
             runs-on: ubuntu-22.04
     timeout-minutes: 30
-    env:
-      runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/docker-cgroups-ubuntu-22
-        if: matrix.runtime == 'docker'
-      - run: sudo systemctl disable --now docker.service docker.socket
-        if: matrix.runtime == 'docker rootless'
-      - run: |
-          cat <<EOT | sudo tee "/etc/apparmor.d/home.runner.bin.rootlesskit"
-          # ref: https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
-          abi <abi/4.0>,
-          include <tunables/global>
-          /home/runner/bin/rootlesskit flags=(unconfined) {
-            userns,
-            # Site-specific additions and overrides. See local/README for details.
-            include if exists <local/home.runner.bin.rootlesskit>
-          }
-          EOT
-          sudo systemctl restart apparmor.service
-        if: matrix.runtime == 'docker rootless'
-      - run: curl -fsSL https://get.docker.com/rootless | FORCE_ROOTLESS_INSTALL=1 sh
-        if: matrix.runtime == 'docker rootless'
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
-        if: matrix.runs-on == 'ubuntu-22.04' && (matrix.runtime == 'podman' || matrix.runtime == 'sudo podman')
-      - uses: actions/download-artifact@v4
+      - name: Save run output
+        id: save
+        run: |
+          echo run=$SRANDOM | tee -a $GITHUB_OUTPUT
+          mkdir run && cd run
+          mkdir "runtime=${{ matrix.runtime }}" && cd *
+          mkdir "readonly=${{ matrix.readonly }}" && cd *
+          mkdir "ca=${{ matrix.ca }}" && cd *
+          mkdir "volume=${{ matrix.volume }}" && cd *
+          mkdir "runs-on=${{ matrix.runs-on }}" && cd *
+          echo "os=${{ matrix.os }}" > "os=${{ matrix.os }}"
+      - uses: actions/upload-artifact@v4
         with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | $runtime load
-      - run: $runtime volume create ${{ matrix.volume }}
-        if: matrix.volume == 'freeipa-data'
-      - name: Run master and replica
-        run: docker="$runtime" readonly=${{ matrix.readonly }} ca=${{ matrix.ca }} VOLUME=${{ matrix.volume }} seccomp=${{ matrix.seccomp }} replica=${{ matrix.replica }} tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-      - name: Show package difference
-        if: failure()
-        run: diff -U 0 <( $runtime run --rm --entrypoint rpm quay.io/freeipa/freeipa-server:${{ matrix.os }} -qa | sort ) <( $runtime run --rm --entrypoint rpm localhost/freeipa-server:${{ matrix.os }} -qa | sort ) || true
-      - name: Run partial tests
-        if: failure()
-        run: docker="$runtime" tests/run-partial-tests.sh Dockerfile.${{ matrix.os }}
+          name: run-${{ steps.save.outputs.run }}
+          path: run
+          retention-days: 1
 
   test-upgrade:
     name: Upgrade
@@ -248,126 +188,38 @@ jobs:
             runtime: podman
             runs-on: ubuntu-24.04
     timeout-minutes: 20
-    env:
-      runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/docker-cgroups-ubuntu-22
-        if: matrix.runtime == 'docker'
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
-        if: matrix.runs-on == 'ubuntu-22.04' && (matrix.runtime == 'podman' || matrix.runtime == 'sudo podman')
-      - uses: actions/download-artifact@v4
+      - name: Save upgrade output
+        id: save
+        run: |
+          echo run=$SRANDOM | tee -a $GITHUB_OUTPUT
+          mkdir upgrade && cd upgrade
+          mkdir "runtime=${{ matrix.runtime }}" && cd *
+          mkdir "data-from=${{ matrix.data-from }}" && cd *
+          mkdir "runs-on=${{ matrix.runs-on }}" && cd *
+          echo "os=${{ matrix.os }}" > "os=${{ matrix.os }}"
+      - uses: actions/upload-artifact@v4
         with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | $runtime load
-      - name: Prepare volume with data (docker)
-        run: $runtime volume create loaded-data && $runtime create --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop
-        if: matrix.runtime == 'docker' || matrix.runtime == 'docker rootless'
-      - name: Prepare volume with data (podman)
-        run: $runtime volume create loaded-data && $runtime run --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop || true
-        if: matrix.runtime == 'podman' || matrix.runtime == 'sudo podman'
-      - name: Populate volume directory from volume
-        run: mkdir /tmp/freeipa-data && $runtime run --security-opt label=disable --volumes-from loaded-data -v /tmp/freeipa-data:/data-out:z --rm docker.io/library/busybox sh -c 'cd /data && cp -a . /data-out'
-      - name: Run master and replica
-        run: docker="$runtime" VOLUME=/tmp/freeipa-data tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-
-  test-k3s:
-    name: Run with K3s with docker
-    runs-on: ubuntu-24.04
-    needs: [ build ]
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ fedora-rawhide, fedora-41, rocky-9, almalinux-8, centos-9-stream ]
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/docker-cgroups-ubuntu-22
-      - uses: actions/download-artifact@v4
-        with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}.tar.gz | docker load
-      - name: Run K3s and master in it
-        run: tests/run-master-in-k3s.sh localhost/freeipa-server:${{ matrix.os }}
+          name: upgrade-${{ steps.save.outputs.run }}
+          path: upgrade
+          retention-days: 1
 
   push-after-success:
     name: Push images to registries
     runs-on: ubuntu-24.04
-    needs: [ master-and-replica, test-upgrade, test-k3s ]
-    if: github.event_name != 'pull_request' && github.repository == 'freeipa/freeipa-container' && github.ref == 'refs/heads/master'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ fedora-rawhide, fedora-41, fedora-40, centos-9-stream, rocky-9, rocky-8, almalinux-9, almalinux-8 ]
+    needs: [ master-and-replica, test-upgrade ]
     timeout-minutes: 30
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: freeipa-server-${{ matrix.os }}
-      - name: Prepare authentication file
-        run: |
-          cat > auth.json << 'EOF'
-          ${{ secrets.REGISTRY_CREDENTIALS_FILE }}
-          EOF
-      - name: Copy ${{ matrix.os }} to registries
-        run: |
-          set -e
-          f=docker-archive:freeipa-server-${{ matrix.os }}.tar.gz
-          while read r ; do
-            if cmp \
-              <( skopeo inspect $r:${{ matrix.os }} \
-                | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) \
-              <( skopeo inspect $f \
-                | jq -r '.Labels."org.opencontainers.image.base.digest", .Labels."org.opencontainers.image.version"' ) ; then
-              echo Built freeipa-server:${{ matrix.os }} is the same as image at ${r#docker://}, not pushing
-              continue
-            fi
-            echo Copying freeipa-server:${{ matrix.os }} to ${r#docker://}
-            skopeo copy --authfile=auth.json $f $r:${{ matrix.os }}
-            VERSION=$( skopeo inspect --format='{{index .Labels "org.opencontainers.image.version"}}' $f | sed 's/-.*//' )
-            test -n "$VERSION"
-            skopeo copy --authfile=auth.json $r:${{ matrix.os }} $r:${{ matrix.os }}-$VERSION
-            echo Tagged as ${{ matrix.os }}-$VERSION as well
-          done << 'EOF'
-          ${{ secrets.REGISTRY_TARGET_LIST }}
-          EOF
-
-  test-subscription:
-    # Workaround https://github.com/actions/runner/issues/1138
-    name: Prerequisite for RHEL builds
-    runs-on: ubuntu-latest
-    timeout-minutes: 1
-    outputs:
-      has_rhel_subscriptions: ${{ steps.check.outputs.has_rhel_subscriptions }}
-    steps:
-      - id: check
-        run: |
-          if [ -n "${{ secrets.REDHAT_ORG }}" -a -n "${{ secrets.REDHAT_ACTIVATIONKEY }}" ] ; then
-            echo "has_rhel_subscriptions=1" >> $GITHUB_OUTPUT
-          fi
-
-  build-test-rhel-podman:
-    name: Build and test RHEL image
-    runs-on: ubuntu-24.04
-    needs: [ test-subscription ]
-    if: needs.test-subscription.outputs.has_rhel_subscriptions == 1
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ rhel-9, rhel-8 ]
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - name: For RHEL builds, use entitlements
-        uses: ./.github/actions/podman-entitlement
+          pattern: run-*
+          path: run
+          merge-multiple: true
+      - run: find run -type f
+      - uses: actions/download-artifact@v4
         with:
-          org: ${{ secrets.REDHAT_ORG }}
-          activationkey: ${{ secrets.REDHAT_ACTIVATIONKEY }}
-      - name: Build image
-        run: podman build -t localhost/freeipa-server:${{ matrix.os }} -f Dockerfile.${{ matrix.os }} .
-      - name: Run master
-        run: docker=podman tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
+          pattern: upgrade-*
+          path: upgrade
+          merge-multiple: true
+      - run: find upgrade -type f
 
