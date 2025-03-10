@@ -1,0 +1,47 @@
+
+run:
+  runs-on:
+    ubuntu-24.04: 2
+    ubuntu-22.04: 1
+  runtime:
+    podman: 4
+    sudo podman: 1
+    docker rootless: 3
+    docker: 2
+  readonly:
+    --read-only: 3
+    "": 1
+  ca:
+    "": 3
+    --external-ca: 1
+  volume:
+    freeipa-data: 1
+    "": 1
+
+test-upgrade:
+  runs-on:
+    ubuntu-24.04: 2
+    ubuntu-22.04: 1
+  runtime:
+    podman: 3
+    docker rootless: 2
+    docker: 1
+  volume:
+    freeipa-data: 1
+    "": 1
+  upgrade-to-from:
+    fedora-rawhide:
+      - fedora-41
+    fedora-41:
+      - fedora-41
+      - fedora-40
+    fedora-40:
+      - fedora-40
+      - fedora-39
+    almalinux-8:
+      - centos-8-certs-updated-data
+    rocky-8:
+      - centos-8-certs-updated-data
+
+k3s:
+

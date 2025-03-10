@@ -45,110 +45,11 @@ jobs:
   master-and-replica:
     name: Run
     runs-on: ${{ matrix.runs-on }}
-    needs: [ build ]
+    needs: [ build, test-plan ]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: fedora-41
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: fedora-41
-            readonly: --read-only
-            volume: freeipa-data
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: fedora-41
-            readonly: --read-only
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: fedora-40
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: fedora-rawhide
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: fedora-rawhide
-            readonly: --read-only
-            ca: --external-ca
-            volume: freeipa-data
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: centos-9-stream
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: centos-9-stream
-            readonly: --read-only
-            volume: freeipa-data
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: centos-9-stream
-            readonly: --read-only
-            ca: --external-ca
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: almalinux-9
-            runtime: docker
-            runs-on: ubuntu-24.04
-          - os: rocky-8
-            runtime: docker
-            runs-on: ubuntu-24.04
-
-          - os: fedora-rawhide
-            readonly: --read-only
-            runtime: docker rootless
-            runs-on: ubuntu-24.04
-          - os: fedora-41
-            readonly: --read-only
-            volume: freeipa-data
-            runtime: docker rootless
-            runs-on: ubuntu-24.04
-          - os: rocky-9
-            readonly: --read-only
-            runtime: docker rootless
-            runs-on: ubuntu-24.04
-          - os: almalinux-8
-            readonly: --read-only
-            volume: freeipa-data
-            runtime: docker rootless
-            runs-on: ubuntu-24.04
-
-          - os: fedora-41
-            runtime: sudo podman
-            runs-on: ubuntu-24.04
-          - os: centos-9-stream
-            runtime: sudo podman
-            runs-on: ubuntu-24.04
-
-          - os: fedora-41
-            readonly: --read-only
-            volume: freeipa-data
-            runtime: podman
-            runs-on: ubuntu-24.04
-          - os: almalinux-9
-            readonly: --read-only
-            volume: freeipa-data
-            runtime: podman
-            runs-on: ubuntu-24.04
-          - os: rocky-8
-            readonly: --read-only
-            runtime: podman
-            runs-on: ubuntu-24.04
-
-          - os: fedora-rawhide
-            readonly: --read-only
-            volume: freeipa-data
-            runtime: podman
-            runs-on: ubuntu-22.04
-          - os: almalinux-8
-            readonly: --read-only
-            volume: freeipa-data
-            runtime: podman
-            runs-on: ubuntu-22.04
-          - os: rocky-9
-            readonly: --read-only
-            runtime: podman
-            runs-on: ubuntu-22.04
+        include: ${{ fromJSON(needs.test-plan.outputs.matrix-run) }}
     timeout-minutes: 30
     steps:
       - run: true
@@ -218,11 +119,13 @@ jobs:
     steps:
       - run: true
 
-  job-summary:
-    name: FreeIPA tests summary
+  test-plan:
+    name: FreeIPA test plan
     runs-on: ubuntu-latest
     needs: [ build ]
     timeout-minutes: 1
+    outputs:
+      matrix-run: ${{ steps.produce-matrix-run.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -230,6 +133,23 @@ jobs:
           pattern: fresh-image-*
           path: fresh-image
           merge-multiple: true
+      - name: Amend the .github/build-test-params.yaml with information about built images
+        run: |
+          (
+              echo 'build-os:'
+              ( yq '.jobs.build.strategy.matrix.os[]' .github/workflows/build-test.yaml | sed 's/^/  - /' )
+              echo 'fresh-os:'
+              ls fresh-image | sed 's/^/  - /'
+              cat .github/build-test-params.yaml
+          ) | yq . - -o json | tee .github/build-test-data.json
+      - id: produce-matrix-run
+        run: |
+          jq -f ci/generate-matrix.jq -c --arg job run --arg count 23 .github/build-test-data.json \
+              | ( echo -n 'matrix=' >> $GITHUB_OUTPUT ; tee -a $GITHUB_OUTPUT ) \
+              | jq '.[]' -
+      - run: jq -f ci/generate-matrix.jq -c --arg job test-upgrade --arg count 7 .github/build-test-data.json | jq '.[]' -
+      - run: jq -f ci/generate-matrix.jq -c --arg job k3s --arg count 5 .github/build-test-data.json | jq '.[]' -
+
       - run: |
           yq '.jobs.master-and-replica.strategy.matrix.include[] | "run/runtime=" + .runtime + "/readonly=" + (.readonly // "") + "/ca=" + (.ca // "") + "/volume=" + (.volume // "") + "/runs-on=" + .runs-on + "/os=" + .os' < .github/workflows/build-test.yaml \
               | while read f ; do mkdir -p "$( dirname "$f" )" ; touch "$f" ; done
