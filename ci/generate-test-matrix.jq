@@ -41,7 +41,7 @@ def random_select($count; $ensure):
 then
 	.run as { "runs-on": $runson, $runtime, $readonly, $ca, $volume, $exclude }
 	| [
-		(.run | .os[$fresh[]] = 1),
+		(.run | .os[(if $fresh | length >0 then $fresh else $os end)[]] = 1),
 		[ {
 		"os": ($fresh | repeat_array(3), $os)[],
 		"runs-on": $runson | frequency_to_list,
@@ -61,7 +61,7 @@ then
 		.["test-upgrade"]
 		| .["data-from"][(.["upgrade-to-from"][$fresh[]] // [])[]] = 1
 		| del(.["upgrade-to-from"])
-		| .os[($fresh | map(select(in($upgrade))))[]] = 1
+		| .os[((if $fresh | length >0 then $fresh else $os end) | map(select(in($upgrade))))[]] = 1
 		),
 		[ {
 		"os": (($fresh | repeat_array(3), $os) | map(select(in($upgrade))))[],
@@ -76,7 +76,7 @@ else if $ARGS.named["job"] == "k3s"
 then
 	.k3s as { "runs-on": $runson, $exclude }
 	| [
-		(.k3s | .os[$fresh[]] = 1),
+		(.k3s | .os[(if $fresh | length >0 then $fresh else $os end)[]] = 1),
 		[ {
 		"os": ($fresh | repeat_array(3), $os)[],
 		"runs-on": $runson | frequency_to_list
