@@ -28,7 +28,7 @@ runs:
         sudo mkdir -p /var/lib/rancher/k3s/storage
         sudo chown $( id -u ) /var/lib/rancher/k3s/storage
 
-        ( set +x ; for i in $( seq 1 10 ) ; do ip link show cni0 > /dev/null && break ; sleep 3 ; done )
+        ( set +x ; for i in $( seq 1 60 ) ; do ip link show cni0 > /dev/null && break ; sleep 5 ; done )
         sudo resolvectl dns cni0 $( kubectl get -n kube-system service/kube-dns -o 'jsonpath={.spec.clusterIP}' )
         sudo resolvectl domain cni0 cluster.local
 
