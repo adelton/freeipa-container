@@ -10,8 +10,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ fedora-rawhide, fedora-41, fedora-40, centos-9-stream, rocky-9, rocky-8, almalinux-9, almalinux-8 ]
-        docker: [ docker ]
+        - os: [ fedora-rawhide, fedora-41, fedora-40, centos-9-stream, rocky-9, rocky-8, almalinux-9, almalinux-8 ]
+          arch: x86_64
+          docker: docker
+        - os: [ fedora-rawhide, rocky-9, almalinux-9 ]
+          arch: x86_64
+          docker: docker
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
