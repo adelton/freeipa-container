@@ -92,9 +92,13 @@ end
 end
 end
 | .[0] as $ensure
-| [
+| {
+"job": $ARGS.named["job"],
+"build-os": $os,
+"matrix": [
 	.[1] | random_select($count; $ensure | del((..|nulls), (.[]|scalars), (.[]|arrays)))
 		 | if ( .os as $os | $fresh | any(. == $os) ) then .["fresh-image"] = true end
-]
-| sort_by(.os, .["runs-on"], .kubernetes, .runtime, .readonly, .ca, .volume, .["data-from"])
+	]
+	| sort_by(.os, .["runs-on"], .kubernetes, .runtime, .readonly, .ca, .volume, .["data-from"])
+}
 

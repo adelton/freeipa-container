@@ -18,10 +18,6 @@ def td($rowspan):
 		+ "</td>"
 ;
 
-def build_os_list:
-	$ARGS.named["build-os"] // ["fedora-rawhide"]
-;
-
 def os_grouping:
 	{
 	"fedora-": "Fedora",
@@ -53,19 +49,17 @@ def os_group:
 ;
 
 (
-.[0]
-|
 if $ARGS.named["job"] == "legend"
 	then "---",
 		"Legend: 🟢 — new image, compared to the one in registry; 🔷 — test is run with image that matches one in registry",
 		halt
 	else empty
 end,
-"## " + if $ARGS.named["job"] == "run"
+"## " + if .job == "run"
 		then "Test master + replica"
-	else if $ARGS.named["job"] == "test-upgrade"
+	else if .job == "test-upgrade"
 		then "Test upgrade from older installation"
-	else if $ARGS.named["job"] == "k8s"
+	else if .job == "k8s"
 		then "Test in Kubernetes"
 	end
 	end
@@ -73,27 +67,30 @@ end,
 "<table>",
 "  <thead>",
 "    <tr>",
-	if $ARGS.named["job"] == "run" then [ "Runtime", "Readonly", "External CA", "Volume", "Runs on Ubuntu" ] | th(2; 1) else empty end,
-	if $ARGS.named["job"] == "test-upgrade" then [ "Runtime", "Runs on Ubuntu", "Upgrade from" ] | th(2; 1) else empty end,
-	if $ARGS.named["job"] == "k8s" then [ "Kubernetes", "Runtime", "Runs on Ubuntu" ] | th(2; 1) else empty end,
-	( build_os_list | os_group ),
+	if .job == "run" then [ "Runtime", "Readonly", "External CA", "Volume", "Runs on Ubuntu" ] | th(2; 1) else empty end,
+	if .job == "test-upgrade" then [ "Runtime", "Runs on Ubuntu", "Upgrade from" ] | th(2; 1) else empty end,
+	if .job == "k8s" then [ "Kubernetes", "Runtime", "Runs on Ubuntu" ] | th(2; 1) else empty end,
+	( .["build-os"] | os_group ),
 "    </tr>",
 "  </thead>",
 "  <tbody>"
 ),
 
 (
-.[]["runs-on"]? |= if . == null then empty else sub("^ubuntu-"; "") end
+.job as $job
+| .["build-os"] as $build_os
+| .matrix
+| .[]["runs-on"]? |= if . == null then empty else sub("^ubuntu-"; "") end
 | .[].readonly? |= if . == null then empty else if . == "--read-only" then "yes (ro)" else "rw" end end
 | .[].ca? |= if . == null then empty else if . == "--external-ca" then "external" else "no" end end
 | .[].volume? |= if . == null then empty else if . == "freeipa-data" then "volume" else "dir" end end
 | sort_by(.kubernetes, .runtime, .readonly, .ca, .volume, -(.["runs-on"] // 0 | tonumber), .["data-from"])
 | reduce .[] as $row ({};
-	if $ARGS.named["job"] == "run"
+	if $job == "run"
 	then .[ $row.runtime ][ $row.readonly ][ $row.ca ][ $row.volume ][ $row["runs-on"] ][ $row.os ] = $row["fresh-image"]
-	else if $ARGS.named["job"] == "test-upgrade"
+	else if $job == "test-upgrade"
 	then .[ $row.runtime ][ $row["runs-on"] ][ $row[ "data-from" ] ][ $row.os ] = $row["fresh-image"]
-	else if $ARGS.named["job"] == "k8s"
+	else if $job == "k8s"
 	then .[ $row.kubernetes ][ $row.runtime ][ $row["runs-on"] ][ $row.os ] = $row["fresh-image"]
 	end
 	end
@@ -110,19 +107,16 @@ end,
 	(
 	if .[0] | length == $max then
 		.[1] as $values
-		| build_os_list[] as $os
+		| $build_os[] as $os
 		| [ if $values | has($os) then
 			if $values[$os] then "🟢" else "🔷" end
 			else "" end ] | td(1)
 	else empty end
 	),
-
 if (.[0] | length) == $max then "    </tr>" else empty end
 ),
 
 (
-.[0]
-|
 "  </tbody>",
 "</table>",
 ""

@@ -120,15 +120,15 @@ jobs:
         shell: bash
       - run: |
           echo '${{ steps.produce-matrix.outputs.matrix-run }}' \
-              | jq -rf ci/test-matrix-to-html.jq --arg job run --argjson build-os "$( jq -c '.["build-os"]' .github/build-test-data.json )" >> $GITHUB_STEP_SUMMARY
+              | jq -rf ci/test-matrix-to-html.jq >> $GITHUB_STEP_SUMMARY
         shell: bash
       - run: |
           echo '${{ steps.produce-matrix.outputs.matrix-test-upgrade }}' \
-              | jq -rf ci/test-matrix-to-html.jq --arg job test-upgrade --argjson build-os "$( jq -c '.["build-os"]' .github/build-test-data.json )" >> $GITHUB_STEP_SUMMARY
+              | jq -rf ci/test-matrix-to-html.jq >> $GITHUB_STEP_SUMMARY
         shell: bash
       - run: |
           echo '${{ steps.produce-matrix.outputs.matrix-k8s }}' \
-              | jq -rf ci/test-matrix-to-html.jq --arg job k8s --argjson build-os "$( jq -c '.["build-os"]' .github/build-test-data.json )" >> $GITHUB_STEP_SUMMARY
+              | jq -rf ci/test-matrix-to-html.jq >> $GITHUB_STEP_SUMMARY
         shell: bash
       - run: jq -n -rf ci/test-matrix-to-html.jq --arg job legend >> $GITHUB_STEP_SUMMARY
         shell: bash
@@ -140,7 +140,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.test-plan.outputs.matrix-run) }}
+        include: ${{ fromJSON(needs.test-plan.outputs.matrix-run) }}{matrix}
     timeout-minutes: 30
     env:
       runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
@@ -191,7 +191,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.test-plan.outputs.matrix-test-upgrade) }}
+        include: ${{ fromJSON(needs.test-plan.outputs.matrix-test-upgrade) }}{matrix}
     timeout-minutes: 20
     env:
       runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
@@ -225,7 +225,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.test-plan.outputs.matrix-k8s ) }}
+        include: ${{ fromJSON(needs.test-plan.outputs.matrix-k8s ) }}{matrix}
     timeout-minutes: 30
     env:
       CRIO_VERSION: v1.32
