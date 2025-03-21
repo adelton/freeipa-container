@@ -1,0 +1,17 @@
+name: Install and start containerd
+runs:
+  using: composite
+  steps:
+    - run: |
+        dpkg -l containerd.io
+        sudo systemctl stop containerd.service || :
+
+        sudo apt update
+        sudo apt install -y containerd
+
+        sudo rm -rf /etc/containerd
+        sudo mkdir /etc/containerd
+        sudo cp tests/containerd-config.toml /etc/containerd/config.toml
+
+        sudo systemctl restart containerd.service
+      shell: bash -euxo pipefail {0}

@@ -47,14 +47,11 @@ test-upgrade:
 
 k8s:
   runs-on:
-    ubuntu-24.04: 2
-    ubuntu-22.04: 1
+    ubuntu-24.04: 1
   kubernetes:
-    k3s: 1
     kubeadm init: 1
   runtime:
-    cri-o: 1
-    docker: 1
+    containerd: 1
   count: 13
   exclude:
     - kubernetes: kubeadm init

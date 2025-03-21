@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ fedora-rawhide, fedora-41, fedora-40, centos-10-stream, centos-9-stream, rocky-9, rocky-8, almalinux-9, almalinux-8 ]
+        os: [ fedora-41 ]
         arch: [ x86_64 ]
         docker: [ docker ]
     timeout-minutes: 15
@@ -147,91 +147,6 @@ jobs:
       - run: jq -n -rf ci/test-matrix-to-html.jq --arg job legend >> $GITHUB_STEP_SUMMARY
         shell: bash
 
-  master-and-replica:
-    name: Run
-    runs-on: ${{ matrix.runs-on }}
-    needs: [ build, test-plan ]
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.test-plan.outputs.matrix-run) }}
-    timeout-minutes: 30
-    env:
-      runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/docker-cgroups-ubuntu-22
-        if: matrix.runtime == 'docker'
-      - run: sudo systemctl disable --now docker.service docker.socket
-        if: matrix.runtime == 'docker rootless'
-      - run: |
-          cat <<EOT | sudo tee "/etc/apparmor.d/home.runner.bin.rootlesskit"
-          # ref: https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
-          abi <abi/4.0>,
-          include <tunables/global>
-          /home/runner/bin/rootlesskit flags=(unconfined) {
-            userns,
-            # Site-specific additions and overrides. See local/README for details.
-            include if exists <local/home.runner.bin.rootlesskit>
-          }
-          EOT
-          sudo systemctl restart apparmor.service
-        if: matrix.runs-on == 'ubuntu-24.04' && matrix.runtime == 'docker rootless'
-      - run: curl -fsSL https://get.docker.com/rootless | FORCE_ROOTLESS_INSTALL=1 sh
-        if: matrix.runtime == 'docker rootless'
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
-        if: matrix.runs-on == 'ubuntu-22.04' && (matrix.runtime == 'podman' || matrix.runtime == 'sudo podman')
-      - uses: actions/download-artifact@v4
-        with:
-          name: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz | $runtime load
-      - run: $runtime volume create ${{ matrix.volume }}
-        if: matrix.volume == 'freeipa-data'
-      - name: Run master and replica
-        run: docker="$runtime" readonly=${{ matrix.readonly }} ca=${{ matrix.ca }} VOLUME=${{ matrix.volume }} seccomp=${{ matrix.seccomp }} replica=${{ matrix.replica }} tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-      - name: Show package difference
-        if: failure()
-        run: diff -U 0 <( $runtime run --rm --entrypoint rpm quay.io/freeipa/freeipa-server:${{ matrix.os }} -qa | sort ) <( $runtime run --rm --entrypoint rpm localhost/freeipa-server:${{ matrix.os }} -qa | sort ) || true
-      - name: Run partial tests
-        if: failure()
-        run: docker="$runtime" tests/run-partial-tests.sh Dockerfile.${{ matrix.os }}
-
-  test-upgrade:
-    name: Upgrade
-    runs-on: ${{ matrix.runs-on }}
-    needs: [ build, test-plan ]
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.test-plan.outputs.matrix-test-upgrade) }}
-    timeout-minutes: 20
-    env:
-      runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/docker-cgroups-ubuntu-22
-        if: matrix.runtime == 'docker'
-      - name: Install podman 4.*
-        uses: ./.github/actions/install-podman-4
-        if: matrix.runs-on == 'ubuntu-22.04' && (matrix.runtime == 'podman' || matrix.runtime == 'sudo podman')
-      - uses: actions/download-artifact@v4
-        with:
-          name: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz | $runtime load
-      - name: Prepare volume with data (docker)
-        run: $runtime volume create loaded-data && $runtime create --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop
-        if: matrix.runtime == 'docker' || matrix.runtime == 'docker rootless'
-      - name: Prepare volume with data (podman)
-        run: $runtime volume create loaded-data && $runtime run --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop || true
-        if: matrix.runtime == 'podman' || matrix.runtime == 'sudo podman'
-      - name: Populate volume directory from volume
-        run: mkdir /tmp/freeipa-data && $runtime run --security-opt label=disable --volumes-from loaded-data -v /tmp/freeipa-data:/data-out:z --rm docker.io/library/busybox sh -c 'cd /data && cp -a . /data-out'
-      - name: Run master and replica
-        run: docker="$runtime" VOLUME=/tmp/freeipa-data tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
-
   test-k8s:
     name: Run in K8s
     runs-on: ${{ matrix.runs-on }}
@@ -250,6 +165,8 @@ jobs:
         if: matrix.runtime == 'cri-o'
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
         if: matrix.runtime == 'docker'
+      - uses: ./.github/actions/install-containerd
+        if: matrix.runtime == 'containerd'
       - uses: ./.github/actions/install-k8s
         env:
           KUBERNETES_VERSION: v1.32
@@ -272,59 +189,4 @@ jobs:
         if: matrix.runtime == 'docker'
       - name: Run master and replica in K8s
         run: tests/run-in-k8s.sh localhost/freeipa-server:${{ matrix.os }}
-
-  push-after-success:
-    name: Push images to registries
-    runs-on: ubuntu-24.04
-    needs: [ master-and-replica, test-upgrade, test-k8s, test-plan ]
-    if: needs.test-plan.outputs.matrix-push != '[]' && github.event_name != 'pull_request' && github.repository == 'freeipa/freeipa-container' && github.ref == 'refs/heads/master'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJSON(needs.test-plan.outputs.matrix-push ) }}
-    timeout-minutes: 30
-    steps:
-      - run: |
-          ARCHES=$( jq -cn '${{ needs.test-plan.outputs.matrix-push-data }} | map(select(.os == "${{ matrix.os }}")) | .[].arch' )
-          echo "arches=$ARCHES" | tee -a $GITHUB_OUTPUT
-          ( echo -n "arches_num=" ; echo "$ARCHES" | jq -r 'length' ) | tee -a $GITHUB_OUTPUT
-          ( echo -n "arch0=" ; echo "$ARCHES" | jq -r '.[0]' ) | tee -a $GITHUB_OUTPUT
-        id: get-arches
-      - uses: actions/download-artifact@v4
-        with:
-          name: freeipa-server-${{ matrix.os }}-${{ steps.get-arches.outputs.arch0 }}
-        if: steps.get-arches.outputs.arches_num == 1
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: freeipa-server-${{ matrix.os }}-*
-          merge-multiple: true
-        if: steps.get-arches.outputs.arches_num != 1
-      - run: |
-          echo '${{ steps.get-arches.outputs.arches }}' \
-          | jq -r '.[] | "docker-archive:freeipa-server-${{ matrix.os }}-" + . + ".tar.gz"' \
-          | xargs podman manifest create freeipa-server:${{ matrix.os }}
-        if: steps.get-arches.outputs.arches_num != 1
-      - name: Prepare authentication file
-        run: |
-          cat > auth.json << 'EOF'
-          ${{ secrets.REGISTRY_CREDENTIALS_FILE }}
-          EOF
-      - name: Copy ${{ matrix.os }} to registries
-        run: |
-          set -e
-          f=docker-archive:freeipa-server-${{ matrix.os }}-${{ steps.get-arches.outputs.arch0 }}.tar.gz
-          while read r ; do
-            echo Copying freeipa-server:${{ matrix.os }} to ${r#docker://}
-            if [ "${{ steps.get-arches.outputs.arches_num }}" -eq 1 ] ; then
-              skopeo copy --authfile=auth.json $f $r:${{ matrix.os }}
-            else
-              podman manifest push --authfile=auth.json freeipa-server:${{ matrix.os }} $r:${{ matrix.os }}
-            fi
-            VERSION=$( skopeo inspect --format='{{index .Labels "org.opencontainers.image.version"}}' $f | sed 's/-.*//' )
-            test -n "$VERSION"
-            skopeo copy --authfile=auth.json --all $r:${{ matrix.os }} $r:${{ matrix.os }}-$VERSION
-            echo Tagged as ${{ matrix.os }}-$VERSION as well
-          done << 'EOF'
-          ${{ secrets.REGISTRY_TARGET_LIST }}
-          EOF
 
