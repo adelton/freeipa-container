@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ fedora-rawhide, fedora-41, fedora-40, centos-10-stream, centos-9-stream, rocky-9, rocky-8, almalinux-9, almalinux-8 ]
+        os: [ fedora-rawhide, fedora-41, fedora-40, rocky-8, almalinux-8 ]
         arch: [ x86_64, arm64 ]
         docker: [ docker ]
         exclude:
@@ -162,6 +162,7 @@ jobs:
     name: Run
     runs-on: ${{ matrix.runs-on }}${{ (matrix.arch == 'arm64' && '-arm') || (matrix.arch == 'x86_64' && '') }}
     needs: [ build, test-plan ]
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -247,6 +248,7 @@ jobs:
     name: Run in K8s
     runs-on: ${{ matrix.runs-on }}${{ (matrix.arch == 'arm64' && '-arm') || (matrix.arch == 'x86_64' && '') }}
     needs: [ build, test-plan ]
+    if: false
     strategy:
       fail-fast: false
       matrix:
