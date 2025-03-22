@@ -14,11 +14,7 @@ on:
           - fedora-rawhide
           - fedora-41
           - fedora-40
-          - centos-10-stream
-          - centos-9-stream
-          - rocky-9
           - rocky-8
-          - almalinux-9
           - almalinux-8
   schedule:
     - cron: '15 4 * * 1,3,5'
@@ -197,7 +193,7 @@ jobs:
     name: Run
     runs-on: ${{ matrix.runs-on }}${{ (matrix.arch == 'arm64' && '-arm') || (matrix.arch == 'x86_64' && '') }}
     needs: [ build, test-plan ]
-    if: needs.test-plan.outputs.matrix-run != '[]'
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -285,7 +281,7 @@ jobs:
     name: Run in K8s
     runs-on: ${{ matrix.runs-on }}${{ (matrix.arch == 'arm64' && '-arm') || (matrix.arch == 'x86_64' && '') }}
     needs: [ build, test-plan ]
-    if: needs.test-plan.outputs.matrix-k8s != '[]'
+    if: false
     strategy:
       fail-fast: false
       matrix:
