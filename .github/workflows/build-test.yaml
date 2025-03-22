@@ -236,7 +236,7 @@ jobs:
         run: $runtime volume create loaded-data && $runtime create --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop
         if: matrix.runtime == 'docker' || matrix.runtime == 'docker rootless'
       - name: Prepare volume with data (podman)
-        run: $runtime volume create loaded-data && $runtime run --name loaded-data -v loaded-data:/data:z quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} noop || true
+        run: $runtime pull quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} && $runtime volume create --driver image --opt image=quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} loaded-data
         if: matrix.runtime == 'podman' || matrix.runtime == 'sudo podman'
       - name: Populate volume directory from volume
         run: mkdir /tmp/freeipa-data && $runtime run --security-opt label=disable --volumes-from loaded-data -v /tmp/freeipa-data:/data-out:z --rm docker.io/library/busybox sh -c 'cd /data && cp -a . /data-out'
