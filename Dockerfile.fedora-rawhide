@@ -7,6 +7,8 @@ COPY resolv.conf hostname /etc/
 RUN echo 'kdcproxy:x:288:' >> /etc/group ; echo 'kdcproxy:x:288:288:IPA KDC Proxy User:/:/sbin/nologin' >> /etc/passwd
 RUN echo 'ipaapi:x:289:' >> /etc/group ; echo 'ipaapi:x:289:289:IPA Framework User:/:/sbin/nologin' >> /etc/passwd
 RUN echo 'sssd:x:285:' >> /etc/group ; echo 'sssd:x:285:285:User for sssd:/run/sssd:/sbin/nologin' >> /etc/passwd
+RUN echo 'ods:x:225:' >> /etc/group ; echo 'ods:x:225:225:opendnssec daemon account:/:/sbin/nologin' >> /etc/passwd
+RUN echo 'printadmin:x:207:' >> /etc/group
 
 # Workaround 1615948
 RUN ln -s /bin/false /usr/local/bin/systemd-machine-id-setup
@@ -17,7 +19,8 @@ RUN dnf upgrade -y --setopt=install_weak_deps=False \
 	&& dnf clean all
 RUN rm -f /usr/lib/rpm/macros.d/macros.usr-local-bin
 
-# debug: RUN test $( getent passwd | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|pkiuser:x:17|sssd:x:285):" | wc -l ) -eq 5
+# debug: RUN test $( getent passwd | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|pkiuser:x:17|sssd:x:285|named:x:25|ods:x:225|tss:x:59):" | wc -l ) -eq 8
+# debug: RUN test $( getent group | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|pkiuser:x:17|sssd:x:285|named:x:25|utmp:x:22|wbpriv:x:88|systemd-journal:x:190|ods:x:225|printadmin:x:207|tss:x:59):" | wc -l ) -eq 12
 
 # var-lib-nfs-rpc_pipefs.mount would run (and fail) nondeterministically
 RUN systemctl mask rpc-gssd.service
