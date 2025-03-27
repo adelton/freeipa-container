@@ -11,9 +11,6 @@ on:
         type: choice
         options:
           - all
-          - fedora-rawhide
-          - fedora-41
-          - fedora-40
           - centos-10-stream
           - centos-9-stream
           - rocky-9
