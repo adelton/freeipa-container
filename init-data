@@ -246,6 +246,7 @@ if [ -f "$DATA/build-id" ] ; then
 				chmod --reference=$DATA_TEMPLATE$i $DATA$i
 			fi
 		done
+		# systemd-tmpfiles --remove --create
 		SYSTEMD_OPTS=--unit=ipa-server-upgrade.service
 	fi
 	if [ -f /etc/ipa/ca.crt ] ; then
