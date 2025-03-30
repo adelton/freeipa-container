@@ -10,16 +10,7 @@ on:
         description: OS / Dockerfile
         type: choice
         options:
-          - all
-          - fedora-rawhide
-          - fedora-41
-          - fedora-40
-          - centos-10-stream
           - centos-9-stream
-          - rocky-9
-          - rocky-8
-          - almalinux-9
-          - almalinux-8
   schedule:
     - cron: '15 4 * * 1,3,5'
 
@@ -289,6 +280,8 @@ jobs:
         if: matrix.volume == 'volume'
       - name: Run master and replica
         run: docker="$runtime" VOLUME=${{ matrix.volume != '' && matrix.volume || '/tmp/freeipa-data' }} tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
+      - uses: lhotari/action-upterm@v1
+        if: failure()
 
   test-k8s:
     name: Run in K8s
