@@ -17,7 +17,7 @@ run:
   volume:
     freeipa-data: 1
     "": null
-  count: 13
+  count: 1
   exclude:
     - arch: arm64
       runs-on: ubuntu-22.04
@@ -30,8 +30,9 @@ test-upgrade:
     ubuntu-24.04: 2
     ubuntu-22.04: 1
   runtime:
-    podman: 3
+    podman: 1
     docker: 1
+    docker rootless: 5
   volume:
     volume-image: 1
     volume: 1
@@ -78,7 +79,7 @@ k8s:
     cri-o: 1
     docker: 1
     containerd: 1
-  count: 11
+  count: 1
   exclude:
     - arch: arm64
       runs-on: ubuntu-22.04
