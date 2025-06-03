@@ -9,7 +9,7 @@ D="$2"
 docker=${docker:-docker}
 
 EXIT=false
-if ! $docker exec $C ipa-server-install -U -r EXAMPLE.TEST -p Secret123 -a Secret123 --setup-dns --no-forwarders --no-ntp ; then
+if ! $docker exec $C ipa-server-install -U -r EXAMPLE.TEST -p Secret123 -a Secret123 --setup-dns --no-forwarders --no-ntp --dns-over-tls --dot-forwarder='1.1.1.1#one.one.one.one' ; then
 	EXIT=true
 fi
 if ! "$EXIT" && ! $docker exec $C ipa-adtrust-install -a Secret123 --netbios-name=EXAMPLE -U ; then

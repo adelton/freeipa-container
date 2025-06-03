@@ -89,7 +89,7 @@ spec:
       protocol: TCP
     - containerPort: 88
       protocol: UDP
-    args: ["ipa-replica-install", "-U", "-r", "CLUSTER.LOCAL", "-P", "admin@CLUSTER.LOCAL", "--ip-address=10.43.202.202", "--no-ntp", "--skip-mem-check"]
+    args: ["ipa-replica-install", "-U", "-r", "CLUSTER.LOCAL", "-P", "admin@CLUSTER.LOCAL", "--ip-address=10.43.202.202", "--no-ntp", "--skip-mem-check", "--dns-over-tls", "--dot-forwarder='1.1.1.1#one.one.one.one'"]
     env:
     - name: PASSWORD
       valueFrom:
