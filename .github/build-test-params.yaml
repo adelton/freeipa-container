@@ -4,10 +4,8 @@ run:
     ubuntu-24.04: 2
     ubuntu-22.04: 1
   runtime:
-    podman: 4
-    sudo podman: 1
-    docker rootless: 3
-    docker: 2
+    docker rootless: 5
+    docker: 1
   readonly:
     --read-only: 3
     "": null
@@ -60,7 +58,7 @@ test-upgrade:
       - centos-8-4.8.7
     rocky-8:
       - centos-8-4.8.7
-  count: 11
+  count: 1
   exclude:
     - arch: arm64
       runs-on: ubuntu-22.04
@@ -78,7 +76,7 @@ k8s:
     cri-o: 1
     docker: 1
     containerd: 1
-  count: 11
+  count: 1
   exclude:
     - arch: arm64
       runs-on: ubuntu-22.04

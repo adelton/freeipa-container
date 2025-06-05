@@ -116,7 +116,7 @@ function run_ipa_container() {
 	if [ "${docker%podman}" = "$docker" ] ; then
 		# if it is not podman, it is docker
 		if $docker info --format '{{ .ClientInfo.Context }}' | grep rootless ; then
-			OPTS="--cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw"
+			OPTS="--security-opt writable-cgroups=true"
 		else
 			# docker with userns remapping enabled
 			:
