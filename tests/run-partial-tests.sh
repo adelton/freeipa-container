@@ -28,7 +28,7 @@ function run_and_wait_for () {
 		# if it is not podman, it is docker
 		OPTS="--tmpfs /run --tmpfs /tmp --sysctl net.ipv6.conf.all.disable_ipv6=0"
 		if $docker info --format '{{ .ClientInfo.Context }}' | grep rootless ; then
-			OPTS="$OPTS --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw"
+			OPTS="$OPTS --security-opt writable-cgroups=true"
 		else
 			# docker with userns remapping enabled
 			:

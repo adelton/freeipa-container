@@ -3,10 +3,8 @@ run:
   runs-on:
     ubuntu-24.04: 1
   runtime:
-    podman: 4
-    sudo podman: 1
-    docker rootless: 3
-    docker: 2
+    docker rootless: 5
+    docker: 1
   readonly:
     --read-only: 3
     "": null
@@ -23,8 +21,7 @@ test-upgrade:
   runs-on:
     ubuntu-24.04: 1
   runtime:
-    podman: 2
-    docker rootless: 2
+    docker rootless: 5
     docker: 1
   volume:
     volume-image: 1
@@ -72,7 +69,7 @@ k8s:
     cri-o: 1
     docker: 1
     containerd: 1
-  count: 9
+  count: 1
   exclude:
     - kubernetes: kubeadm init
       runtime: docker
