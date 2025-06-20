@@ -173,7 +173,7 @@ else
 	if [ "$replica" = 'none' ] ; then
 		dns_opts=""
 	fi
-	run_ipa_container $IMAGE freeipa-master exit-on-finished -U -r EXAMPLE.TEST --setup-dns --no-forwarders $dns_opts $skip_opts --no-ntp $ca
+	run_ipa_container $IMAGE freeipa-master exit-on-finished -U -r EXAMPLE.TEST --setup-dns --no-forwarders $dns_opts $skip_opts --no-ntp $ca --dns-over-tls --dot-forwarder='1.1.1.1#one.one.one.one'
 
 	if [ -n "$ca" ] ; then
 		$docker rm -f freeipa-master
