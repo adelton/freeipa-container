@@ -1,0 +1,11 @@
+name: Upterm session
+on:
+  - push
+  - workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v6
+    - name: Setup upterm session
+      uses: owenthereal/action-upterm@v1
