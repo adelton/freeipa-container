@@ -14,7 +14,7 @@ runs:
         if [ -e /etc/apt/sources.list.d/microsoft-prod.list ] ; then sudo mv -f /etc/apt/sources.list.d/microsoft-prod.list /etc/apt/sources.list.d/microsoft-prod.list.disabled ; fi
 
         sudo apt update
-        sudo apt install -y kubelet kubeadm kubectl kubernetes-cni
+        sudo apt install -y kubelet kubeadm kubectl containernetworking-plugins
 
         sudo modprobe br_netfilter
         sudo sysctl -w net.ipv4.ip_forward=1
