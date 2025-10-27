@@ -3,8 +3,9 @@ docker_builder:
   env:
     CIRRUS_ARCH: arm64
     matrix:
-      - os: fedora-39
+      - os: fedora-42
   config_script:
+    - id
     - groupadd -g 200000 testuser
     - useradd -m -u 200000 -g 200000 testuser
     - sed -i 's/^docker:.*/&testuser/' /etc/group
@@ -21,10 +22,11 @@ docker_builder:
   env:
     CIRRUS_ARCH: arm64
     matrix:
-      - os: centos-9-stream
+      - os: almalinux-10
   install_script:
     - sudo apt-get -y update
     - sudo apt-get -y install podman
+    - id
     - groupadd -g 200000 testuser
     - useradd -m -u 200000 -g 200000 testuser
     - echo testuser:200001:65535 > /etc/subuid
