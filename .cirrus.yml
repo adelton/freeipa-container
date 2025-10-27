@@ -10,7 +10,6 @@ docker_builder:
     - useradd -m -u 200000 -g 200000 testuser
     - sed -i 's/^docker:.*/&testuser/' /etc/group
     - echo '{"userns-remap":"default"}' > /etc/docker/daemon.json
-    - echo '{"userns-remap":"default"}' > /etc/docker/daemon.json
     - echo dockremap:200000:65536 > /etc/subuid
     - echo dockremap:200000:65536 > /etc/subgid
     - systemctl restart docker
@@ -31,7 +30,5 @@ docker_builder:
     - useradd -m -u 200000 -g 200000 testuser
     - echo testuser:200001:65535 > /etc/subuid
     - echo testuser:200001:65535 > /etc/subgid
-    - echo 'testuser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/testuser-without-password
-    - chmod 600 /etc/sudoers.d/testuser-without-password
   build_script: su -l testuser -c "cd $PWD && podman build -t localhost/freeipa/freeipa-server:$os -f Dockerfile.$os ."
   test_script: su -l testuser -c "cd $PWD && docker=podman tests/run-master-and-replica.sh localhost/freeipa/freeipa-server:$os"
