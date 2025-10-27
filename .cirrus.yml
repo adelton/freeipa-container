@@ -6,12 +6,12 @@ docker_builder:
       - os: fedora-42
   config_script:
     - id
-    - groupadd -g 200000 testuser
-    - useradd -m -u 200000 -g 200000 testuser
-    - sed -i 's/^docker:.*/&testuser/' /etc/group
-    - echo '{"userns-remap":"default"}' > /etc/docker/daemon.json
+    - ls -la /dev/std*
+    - ls -la /proc/self/fd
+    - useradd -m -u 200000 -U -G docker testuser
     - echo dockremap:200000:65536 > /etc/subuid
     - echo dockremap:200000:65536 > /etc/subgid
+    - echo '{"userns-remap":"default"}' > /etc/docker/daemon.json
     - systemctl restart docker
   build_script: runuser -u testuser -- docker build -t localhost/freeipa/freeipa-server:$os -f Dockerfile.$os .
   test_script: runuser -u testuser -- tests/run-master-and-replica.sh localhost/freeipa/freeipa-server:$os
@@ -23,11 +23,8 @@ docker_builder:
     matrix:
       - os: almalinux-10
   install_script:
-    - sudo apt-get -y update
-    - sudo apt-get -y install podman
-    - id
-    - groupadd -g 200000 testuser
-    - useradd -m -u 200000 -g 200000 testuser
+    - apt update && apt install -y podman
+    - useradd -m -u 200000 -U testuser
     - echo testuser:200001:65535 > /etc/subuid
     - echo testuser:200001:65535 > /etc/subgid
   build_script: su -l testuser -c "cd $PWD && podman build -t localhost/freeipa/freeipa-server:$os -f Dockerfile.$os ."
