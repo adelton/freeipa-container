@@ -12,15 +12,7 @@ on:
         options:
           - all
           - fedora-rawhide
-          - fedora-43
-          - fedora-42
           - almalinux-10
-          - almalinux-9
-          - almalinux-8
-          - rocky-9
-          - rocky-8
-          - centos-10-stream
-          - centos-9-stream
   schedule:
     - cron: '15 4 * * 1,3,5'
 
@@ -305,6 +297,8 @@ jobs:
       - run: sudo systemctl stop docker && sudo rm -f /var/run/docker.sock
         if: matrix.runtime != 'docker'
       - uses: ./.github/actions/install-containerd-2.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: matrix.runtime == 'containerd'
       - uses: ./.github/actions/install-k8s
         env:
