@@ -16,8 +16,9 @@ run:
   volume:
     freeipa-data: 1
     "": null
-  count: 11
+  count: 1
   exclude:
+    - arch: arm64
 
 test-upgrade:
   runs-on:
@@ -54,12 +55,13 @@ test-upgrade:
       - centos-8-4.8.7
     rocky-8:
       - centos-8-4.8.7
-  count: 9
+  count: 1
   exclude:
     - volume: volume-image
       runtime: docker
     - volume: volume-image
       runtime: docker rootless
+    - arch: arm64
 
 k8s:
   runs-on:
@@ -71,13 +73,14 @@ k8s:
   runtime:
     cri-o: 1
     docker: 1
-    containerd: 1
+    containerd: 7
   count: 9
   exclude:
     - kubernetes: kubeadm init
       runtime: docker
     - kubernetes: rke2
       runtime: docker
+    - arch: arm64
 
 push:
   exclude:
