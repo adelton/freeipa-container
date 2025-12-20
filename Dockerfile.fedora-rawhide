@@ -18,6 +18,11 @@ RUN sed -i 's!%_install_langs.*!%_install_langs all!' /etc/rpm/macros.image-lang
 RUN dnf upgrade -y --setopt=install_weak_deps=False \
 	&& dnf install -y --setopt=install_weak_deps=False freeipa-server freeipa-server-dns freeipa-server-trust-ad freeipa-healthcheck freeipa-client-epn freeipa-server-encrypted-dns patch \
 	&& dnf clean all
+RUN dnf downgrade -y --setopt=install_weak_deps=False https://kojipkgs.fedoraproject.org//packages/389-ds-base/3.1.3/10.fc44/$( uname -m )/389-ds-base-3.1.3-10.fc44.$( uname -m ).rpm \
+	https://kojipkgs.fedoraproject.org//packages/389-ds-base/3.1.3/10.fc44/$( uname -m )/389-ds-base-libs-3.1.3-10.fc44.$( uname -m ).rpm \
+	https://kojipkgs.fedoraproject.org//packages/389-ds-base/3.1.3/10.fc44/$( uname -m )/389-ds-base-robdb-libs-3.1.3-10.fc44.$( uname -m ).rpm \
+	https://kojipkgs.fedoraproject.org//packages/389-ds-base/3.1.3/10.fc44/noarch/python3-lib389-3.1.3-10.fc44.noarch.rpm \
+	&& dnf clean all
 RUN rm -f /usr/lib/rpm/macros.d/macros.usr-local-bin
 
 # debug: RUN test $( getent passwd | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|pkiuser:x:17|sssd:x:285|named:x:25|ods:x:225|tss:x:59|unbound:x:325):" | wc -l ) -eq 9
