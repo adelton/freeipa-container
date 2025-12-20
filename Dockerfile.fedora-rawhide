@@ -15,6 +15,7 @@ RUN groupadd -g 325 unbound; useradd -u 325 -g 325 -c 'Unbound DNS resolver' -r 
 RUN ln -s /bin/false /usr/local/bin/systemd-machine-id-setup
 RUN rpm --eval '%_install_script_path' | sed 's#^#%_install_script_path /usr/local/bin:# ' > /usr/lib/rpm/macros.d/macros.usr-local-bin
 RUN sed -i 's!%_install_langs.*!%_install_langs all!' /etc/rpm/macros.image-language-conf
+RUN dnf copr enable -y vashirov/bz2424132
 RUN dnf upgrade -y --setopt=install_weak_deps=False \
 	&& dnf install -y --setopt=install_weak_deps=False freeipa-server freeipa-server-dns freeipa-server-trust-ad freeipa-healthcheck freeipa-client-epn freeipa-server-encrypted-dns patch \
 	&& dnf clean all
