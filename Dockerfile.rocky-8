@@ -10,7 +10,11 @@ RUN groupadd -g 207 printadmin
 # Workaround https://bugzilla.redhat.com/show_bug.cgi?id=1615948
 RUN ln -s /bin/false /usr/sbin/systemd-machine-id-setup
 RUN sed -i 's!%_install_langs.*!%_install_langs all!' /etc/rpm/macros.image-language-conf
-RUN yum -y module enable idm:DL1 && yum -y install patch sudo && yum -y module install --setopt=install_weak_deps=False idm:DL1/adtrust idm:DL1/dns && yum clean all
+RUN yum -y module enable idm:DL1 \
+	&& yum -y install patch sudo \
+	&& yum -y install '389-ds-base-1.4.3.39-15.module+el8.10.0+2062+48ef5fda' \
+	&& yum -y module install --setopt=install_weak_deps=False idm:DL1/adtrust idm:DL1/dns \
+	&& yum clean all
 
 # debug: RUN test $( getent passwd | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|pkiuser:x:17|sssd:x:285|named:x:25|ods:x:225|tss:x:59):" | wc -l ) -eq 8
 # debug: RUN test $( getent group | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|pkiuser:x:17|sssd:x:285|named:x:25|utmp:x:22|wbpriv:x:88|systemd-journal:x:190|ods:x:225|printadmin:x:207|tss:x:59):" | wc -l ) -eq 12
