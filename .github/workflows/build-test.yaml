@@ -49,7 +49,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(needs.init.outputs.os ) }}
         arch: [ x86_64, arm64 ]
-        docker: [ docker ]
+        docker: [ podman ]
         exclude:
           - os: centos-10-stream
             arch: x86_64
