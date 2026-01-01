@@ -117,7 +117,8 @@ fi
 # We rerun the build and assume that it will use cached layers all the way,
 # so this build invocation will only add the labels
 set -x
-$docker build -f "$DOCKERFILE" -t "$TAG" \
+$docker buildx create --use --driver docker-container
+$docker buildx build -f "$DOCKERFILE" -t "$TAG" \
 	--label org.opencontainers.image.created="$CREATED" \
 	--label org.opencontainers.image.revision=$COMMIT \
 	--label org.opencontainers.image.version="$IPA_VERSION-rpms-$RPM_QA_SHA-gittree-$GITTREE" \
@@ -128,4 +129,6 @@ $docker build -f "$DOCKERFILE" -t "$TAG" \
 	--annotation org.opencontainers.image.version="$IPA_VERSION-rpms-$RPM_QA_SHA-gittree-$GITTREE" \
 	--annotation org.opencontainers.image.base.name=$FROM \
 	--annotation org.opencontainers.image.base.digest=$BASE_DIGEST \
-	"${OPTS[@]}" .
+	"${OPTS[@]}" \
+	--output type=docker,oci-mediatypes=true,dest=freeipa-server-image.tar \
+	.
