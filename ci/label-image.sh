@@ -106,9 +106,11 @@ if $docker inspect "$TAG" | jq -e '.[0].Config.Labels.usage' > /dev/null ; then
 fi
 if test -n "$REPO_URL" ; then
 	OPTS+=(--label org.opencontainers.image.source="$REPO_URL/blob/$COMMIT/$DOCKERFILE")
+	OPTS+=(--annotation org.opencontainers.image.source="$REPO_URL/blob/$COMMIT/$DOCKERFILE")
 fi
 if test -n "$JOB_PATH" ; then
 	OPTS+=(--label org.opencontainers.image.url="$REPO_URL/$JOB_PATH")
+	OPTS+=(--annotation org.opencontainers.image.url="$REPO_URL/$JOB_PATH")
 fi
 
 
@@ -121,4 +123,9 @@ $docker build -f "$DOCKERFILE" -t "$TAG" \
 	--label org.opencontainers.image.version="$IPA_VERSION-rpms-$RPM_QA_SHA-gittree-$GITTREE" \
 	--label org.opencontainers.image.base.name=$FROM \
 	--label org.opencontainers.image.base.digest=$BASE_DIGEST \
+	--annotation org.opencontainers.image.created="$CREATED" \
+	--annotation org.opencontainers.image.revision=$COMMIT \
+	--annotation org.opencontainers.image.version="$IPA_VERSION-rpms-$RPM_QA_SHA-gittree-$GITTREE" \
+	--annotation org.opencontainers.image.base.name=$FROM \
+	--annotation org.opencontainers.image.base.digest=$BASE_DIGEST \
 	"${OPTS[@]}" .
