@@ -48,10 +48,9 @@ fi
 test -n "$GITTREE"
 
 
-tar x -C $TMPDIR -f $IMAGE_FILE index.json manifest.json
+tar x -C $TMPDIR -f $IMAGE_FILE
 OCI_MANIFEST=$( jq -r '.manifests[0].digest' $TMPDIR/index.json | sed 's%^sha256:%blobs/sha256/%' )
 test -n "$OCI_MANIFEST"
-tar x -C $TMPDIR -f $IMAGE_FILE $OCI_MANIFEST
 OCI_CONFIG=$( jq -r '.config.digest' $TMPDIR/$OCI_MANIFEST | sed 's%^sha256:%blobs/sha256/%' )
 test -n "$OCI_CONFIG"
 
@@ -60,7 +59,6 @@ test -n "$DOCKER_CONFIG"
 
 test "$OCI_CONFIG" = "$DOCKER_CONFIG"
 
-tar x -C $TMPDIR -f $IMAGE_FILE $OCI_CONFIG
 jq --arg CREATED "$CREATED" \
 	--arg COMMIT "$COMMIT" \
 	--arg VERSION "$IPA_VERSION-rpms-$RPM_QA_SHA-gittree-$GITTREE" \
@@ -85,23 +83,29 @@ jq --arg CREATED "$CREATED" \
 EOS
 CONFIG_SHA=$( sha256sum $TMPDIR/oci-config | sed 's/ .*//' )
 CONFIG_SIZE=$( wc -c < $TMPDIR/oci-config )
-mv -v $TMPDIR/oci-config $TMPDIR/blobs/sha256/$CONFIG_SHA
 
 jq --arg SHA $CONFIG_SHA --argjson SIZE $CONFIG_SIZE \
 	'.config.digest = "sha256:" + $SHA | .config.size = $SIZE' $TMPDIR/$OCI_MANIFEST > $TMPDIR/oci-manifest
 OCI_MANIFEST_SHA=$( sha256sum $TMPDIR/oci-manifest | sed 's/ .*//' )
 OCI_MANIFEST_SIZE=$( wc -c < $TMPDIR/oci-manifest )
-mv -v $TMPDIR/oci-manifest $TMPDIR/blobs/sha256/$OCI_MANIFEST_SHA
 
 jq --arg SHA $OCI_MANIFEST_SHA --argjson SIZE $OCI_MANIFEST_SIZE -f /dev/stdin <<'EOS' $TMPDIR/index.json > $TMPDIR/index.json.new
 	.manifests[0].digest = "sha256:" + $SHA
 	| .manifests[0].size = $SIZE
 	| .manifests[0].annotations["org.opencontainers.image.ref.name"] = .manifests[0].annotations["io.containerd.image.name"]
 EOS
-mv -v $TMPDIR/index.json.new $TMPDIR/index.json
 
 jq --arg SHA $CONFIG_SHA '.[0].Config = "blobs/sha256/" + $ARGS.named["SHA"]' $TMPDIR/manifest.json > $TMPDIR/manifest.json.new
-mv -v $TMPDIR/manifest.json.new $TMPDIR/manifest.json
 
-tar r -C $TMPDIR -vf $IMAGE_FILE blobs/sha256/$CONFIG_SHA blobs/sha256/$OCI_MANIFEST_SHA index.json manifest.json
+(
+cd $TMPDIR
+rm -v $OCI_CONFIG
+mv -v oci-config blobs/sha256/$CONFIG_SHA
+rm -v $OCI_MANIFEST
+mv -v oci-manifest blobs/sha256/$OCI_MANIFEST_SHA
+mv -v index.json.new index.json
+mv -v manifest.json.new manifest.json
+)
+
+tar c -C $TMPDIR -f $IMAGE_FILE --owner=0 --group=0 --numeric-owner $( cd $TMPDIR && ls )
 
