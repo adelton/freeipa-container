@@ -7,7 +7,7 @@
 -  hostUsers: false
    containers:
    - name: freeipa-server
-     image: localhost/freeipa-server:latest
+     image: quay.io/freeipa/freeipa-server:latest
 @@ -123,3 +123,7 @@ spec:
    subdomain: dom1
    setHostnameAsFQDN: true

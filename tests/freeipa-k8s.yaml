@@ -76,8 +76,8 @@ spec:
   hostUsers: false
   containers:
   - name: freeipa-server
-    image: localhost/freeipa-server:latest
-    imagePullPolicy: Never
+    image: quay.io/freeipa/freeipa-server:latest
+    imagePullPolicy: IfNotPresent
     securityContext:
       readOnlyRootFilesystem: true
     volumeMounts:
