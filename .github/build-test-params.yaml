@@ -71,7 +71,7 @@ k8s:
     rke2: 1
     k0s: 1
   runtime:
-    cri-o: 1
+    cri-o: 7
     docker: 1
     containerd: 1
   count: 9
