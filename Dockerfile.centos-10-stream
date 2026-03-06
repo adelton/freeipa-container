@@ -11,7 +11,7 @@ RUN groupadd -g 325 unbound; useradd -u 325 -g 325 -c 'Unbound DNS resolver' -r 
 # Workaround https://bugzilla.redhat.com/show_bug.cgi?id=1615948
 RUN ln -s /bin/false /usr/sbin/systemd-machine-id-setup
 RUN sed -i 's!%_install_langs.*!%_install_langs all!' /etc/rpm/macros.image-language-conf
-RUN dnf -y install --setopt=install_weak_deps=False ipa-server ipa-server-dns ipa-server-trust-ad patch ipa-healthcheck ipa-client-epn ipa-server-encrypted-dns \
+RUN dnf -y install --setopt=install_weak_deps=False 389-ds-base-3.1.3-5.el10 ipa-server ipa-server-dns ipa-server-trust-ad patch ipa-healthcheck ipa-client-epn ipa-server-encrypted-dns \
 	&& dnf clean all
 
 # debug: RUN test $( getent passwd | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|pkiuser:x:17|sssd:x:285|named:x:25|ods:x:225|tss:x:59|unbound:x:325):" | wc -l ) -eq 9
