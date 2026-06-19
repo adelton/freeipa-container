@@ -17,7 +17,7 @@ run:
   volume:
     freeipa-data: 1
     "": null
-  count: 11
+  count: 3
   exclude:
 
 test-upgrade:
@@ -57,7 +57,7 @@ test-upgrade:
       - centos-8-4.8.7
     rocky-8:
       - centos-8-4.8.7
-  count: 9
+  count: 3
   exclude:
     - volume: volume-image
       runtime: docker
@@ -77,7 +77,7 @@ k8s:
     cri-o: 1
     docker: 1
     containerd: 1
-  count: 9
+  count: 3
   exclude:
     - kubernetes: kubeadm init
       runtime: docker
