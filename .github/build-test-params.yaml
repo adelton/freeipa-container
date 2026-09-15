@@ -17,7 +17,7 @@ run:
   volume:
     freeipa-data: 1
     "": null
-  count: 11
+  count: 3
   exclude:
 
 test-upgrade:
@@ -37,6 +37,8 @@ test-upgrade:
     fedora-rawhide:
       - fedora-44-4.13.1
       - fedora-43-4.12.5
+    fedora-45:
+      - fedora-44-4.13.1
     fedora-44:
       - fedora-44-4.13.1
       - fedora-43-4.12.5
@@ -58,7 +60,7 @@ test-upgrade:
       - centos-8-4.8.7
     rocky-8:
       - centos-8-4.8.7
-  count: 9
+  count: 1
   exclude:
     - volume: volume-image
       runtime: docker
@@ -78,7 +80,7 @@ k8s:
     cri-o: 1
     docker: 1
     containerd: 1
-  count: 9
+  count: 1
   exclude:
     - kubernetes: kubeadm init
       runtime: docker
@@ -94,6 +96,8 @@ k8s:
 push:
   exclude:
     - os: centos-10-stream
+    - os: fedora-45
+      arch: arm64
     - os: fedora-44
       arch: arm64
     - os: fedora-43
