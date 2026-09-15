@@ -36,6 +36,8 @@ test-upgrade:
     fedora-rawhide:
       - fedora-44-4.13.1
       - fedora-43-4.12.5
+    fedora-45:
+      - fedora-44-4.13.1
     fedora-44:
       - fedora-44-4.13.1
       - fedora-43-4.12.5
@@ -93,6 +95,8 @@ k8s:
 push:
   exclude:
     - os: centos-10-stream
+    - os: fedora-45
+      arch: arm64
     - os: fedora-44
       arch: arm64
     - os: fedora-43

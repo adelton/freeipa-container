@@ -12,15 +12,9 @@ on:
         options:
           - all
           - fedora-rawhide
+          - fedora-45
           - fedora-44
-          - fedora-43
           - almalinux-10
-          - almalinux-9
-          - almalinux-8
-          - rocky-9
-          - rocky-8
-          - centos-10-stream
-          - centos-9-stream
   schedule:
     - cron: '15 4 * * 1,3,5'
 
@@ -55,6 +49,8 @@ jobs:
         arch: [ x86_64, arm64 ]
         docker: [ docker ]
         exclude:
+          - os: fedora-45
+            arch: arm64
           - os: fedora-44
             arch: arm64
           - os: fedora-43
