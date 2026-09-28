@@ -11,16 +11,9 @@ on:
         type: choice
         options:
           - all
-          - fedora-rawhide
-          - fedora-44
-          - fedora-43
           - almalinux-10
           - almalinux-9
           - almalinux-8
-          - rocky-9
-          - rocky-8
-          - centos-10-stream
-          - centos-9-stream
   schedule:
     - cron: '15 4 * * 1,3,5'
 
@@ -220,6 +213,29 @@ jobs:
               | jq -cj '"matrix-push-data=", ., "\n"' >> $GITHUB_OUTPUT
       - run: jq -n -rf ci/test-matrix-to-html.jq --arg job legend >> $GITHUB_STEP_SUMMARY
 
+  build-ipa-client:
+    name: Ensure ipa-client image in cache
+    runs-on: ubuntu-26.04${{ (matrix.arch == 'arm64' && '-arm') || (matrix.arch == 'x86_64' && '') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86_64
+          - arm64
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v6
+        with:
+          path: ipa-client.tar.gz
+          key: v0.1-${{ hashFiles('Dockerfile.test-client') }}-${{ matrix.arch }}
+          lookup-only: true
+        id: cache-ipa-client
+      - run: |
+          docker build -t localhost/ipa-client -f Dockerfile.test-client .
+          docker save localhost/ipa-client | gzip > ipa-client.tar.gz
+        if: steps.cache-ipa-client.outputs.cache-hit != 'true'
+
   master-and-replica:
     name: Run
     runs-on: ${{ matrix.runs-on }}${{ (matrix.arch == 'arm64' && '-arm') || (matrix.arch == 'x86_64' && '') }}
@@ -241,6 +257,13 @@ jobs:
         id: download-image
         background: true
       - uses: actions/checkout@v6
+      - uses: actions/cache@v6
+        with:
+          path: ipa-client.tar.gz
+          key: v0.1-${{ hashFiles('Dockerfile.test-client') }}-${{ matrix.arch }}
+          fail-on-cache-miss: true
+        id: download-ipa-client
+        background: true
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
         if: matrix.runtime == 'docker'
       - uses: ./.github/actions/install-docker-rootless
@@ -249,6 +272,9 @@ jobs:
         env:
           VOLUME: ${{ matrix.volume }}
         if: matrix.volume == 'freeipa-data'
+        background: true
+      - wait: download-ipa-client
+      - run: gunzip < ipa-client.tar.gz | $runtime load
         background: true
       - wait: download-image
       - name: Load image
@@ -289,6 +315,13 @@ jobs:
         id: download-image
         background: true
       - uses: actions/checkout@v6
+      - uses: actions/cache@v6
+        with:
+          path: ipa-client.tar.gz
+          key: v0.1-${{ hashFiles('Dockerfile.test-client') }}-${{ matrix.arch }}
+          fail-on-cache-miss: true
+        id: download-ipa-client
+        background: true
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
         if: matrix.runtime == 'docker'
       - uses: ./.github/actions/install-docker-rootless
@@ -319,6 +352,9 @@ jobs:
         env:
           VOLUME: ${{ matrix.volume }}
         if: matrix.volume == 'volume'
+        background: true
+      - wait: download-ipa-client
+      - run: gunzip < ipa-client.tar.gz | $runtime load
         background: true
       - wait: download-image
       - name: Load image
@@ -388,6 +424,16 @@ jobs:
         background: true
       - run: patch tests/freeipa-replica-k8s.yaml < tests/freeipa-k8s.yaml.containerd.patch
         if: matrix.runtime == 'containerd'
+        background: true
+      - uses: actions/cache@v6
+        with:
+          path: ipa-client.tar.gz
+          key: v0.1-${{ hashFiles('Dockerfile.test-client') }}-${{ matrix.arch }}
+          fail-on-cache-miss: true
+        id: download-ipa-client
+        background: true
+      - wait: download-ipa-client
+      - run: gunzip < ipa-client.tar.gz | podman load
         background: true
       - wait: download-image
       - run: sudo skopeo copy "oci-archive:freeipa-server-$OS-$ARCH.tar.gz" "containers-storage:localhost/freeipa-server:$OS"
