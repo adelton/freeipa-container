@@ -113,6 +113,7 @@ jobs:
           name: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
           path: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
           retention-days: 1
+        background: true
       - run: |
           mkdir -p build-status/${{ matrix.os }}-${{ matrix.arch }}
           ( echo "- os: ${{ matrix.os }}" ; echo "  arch: ${{ matrix.arch }}" ) > build-status/${{ matrix.os }}-${{ matrix.arch }}/build-dist
@@ -150,6 +151,8 @@ jobs:
           name: build-status-${{ matrix.os }}-${{ matrix.arch }}
           path: build-status
           retention-days: 1
+        background: true
+      - wait-all:
 
   test-plan:
     name: FreeIPA test plan
@@ -224,18 +227,25 @@ jobs:
     env:
       runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
     steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
+        id: download-image
+        background: true
       - uses: actions/checkout@v6
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
         if: matrix.runtime == 'docker'
       - uses: ./.github/actions/install-docker-rootless
         if: matrix.runtime == 'docker rootless'
-      - uses: actions/download-artifact@v8
-        with:
-          name: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz | $runtime load
       - run: $runtime volume create ${{ matrix.volume }}
         if: matrix.volume == 'freeipa-data'
+        background: true
+      - wait:
+          - download-image
+      - name: Load image
+        run: gunzip < freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz | $runtime load
+        background: true
+      - wait-all:
       - name: Run master and replica
         run: docker="$runtime" readonly=${{ matrix.readonly }} ca=${{ matrix.ca }} VOLUME=${{ matrix.volume }} seccomp=${{ matrix.seccomp }} replica=${{ matrix.replica }} tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
       - name: Show package difference
@@ -258,21 +268,22 @@ jobs:
     env:
       runtime: ${{ matrix.runtime == 'docker rootless' && 'docker' || matrix.runtime }}
     steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
+        id: download-image
+        background: true
       - uses: actions/checkout@v6
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
         if: matrix.runtime == 'docker'
       - uses: ./.github/actions/install-docker-rootless
         if: matrix.runtime == 'docker rootless'
-      - uses: actions/download-artifact@v8
-        with:
-          name: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
-      - name: Load image
-        run: gunzip < freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz | $runtime load
       - name: Populate volume with data using image driver
         run: |
           $runtime pull quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} \
             && $runtime volume create --driver image --opt image=quay.io/freeipa/freeipa-server:data-${{ matrix.data-from }} ${{ matrix.volume }}
         if: matrix.volume == 'volume-image'
+        background: true
       - name: Populate volume directory with data
         run: |
           mkdir -p /tmp/freeipa-data/image \
@@ -281,11 +292,22 @@ jobs:
                  | while read f ; do $runtime run --rm -v /tmp/freeipa-data:/data:z --workdir /data docker.io/library/busybox tar xf image/$f ; done \
             && rm -rf /tmp/freeipa-data/image
         if: matrix.volume == '' || matrix.volume == 'volume'
+        id: populate-volume-directory
+        background: true
+      - wait:
+          - populate-volume-directory
       - name: Populate volume with data
         run: |
           $runtime volume create ${{ matrix.volume }} \
             && $runtime run --rm -v /tmp/freeipa-data:/data-in:z -v ${{ matrix.volume }}:/data:z --workdir /data docker.io/library/busybox cp -a /data-in/. .
         if: matrix.volume == 'volume'
+        background: true
+      - wait:
+          - download-image
+      - name: Load image
+        run: gunzip < freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz | $runtime load
+        background: true
+      - wait-all:
       - name: Run master and replica
         run: docker="$runtime" VOLUME=${{ matrix.volume != '' && matrix.volume || '/tmp/freeipa-data' }} tests/run-master-and-replica.sh localhost/freeipa-server:${{ matrix.os }}
 
@@ -302,8 +324,13 @@ jobs:
     env:
       CRIO_VERSION: v1.36
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
+        id: download-image
+        background: true
       - run: test -f /sys/fs/cgroup/cgroup.controllers
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/install-crio
         if: matrix.runtime == 'cri-o'
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
@@ -324,9 +351,16 @@ jobs:
         if: matrix.kubernetes == 'rke2'
       - uses: ./.github/actions/install-k0s
         if: matrix.kubernetes == 'k0s'
-      - uses: actions/download-artifact@v8
-        with:
-          name: freeipa-server-${{ matrix.os }}-${{matrix.arch}}
+      - parallel:
+          - run: patch tests/freeipa-k8s.yaml < tests/freeipa-k8s.yaml.docker.patch
+            if: matrix.runtime == 'docker'
+          - run: patch tests/freeipa-replica-k8s.yaml < tests/freeipa-k8s.yaml.docker.patch
+            if: matrix.runtime == 'docker'
+          - run: patch tests/freeipa-k8s.yaml < tests/freeipa-k8s.yaml.containerd.patch
+            if: matrix.runtime == 'containerd'
+          - run: patch tests/freeipa-replica-k8s.yaml < tests/freeipa-k8s.yaml.containerd.patch
+            if: matrix.runtime == 'containerd'
+      - wait: download-image
       - run: sudo skopeo copy oci-archive:freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz containers-storage:localhost/freeipa-server:${{ matrix.os }}
         if: matrix.runtime == 'cri-o'
       - name: Load image to docker
@@ -338,14 +372,6 @@ jobs:
       - name: Load image to containerd in K3s
         run: gunzip < freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz | sudo k3s ctr images import -
         if: matrix.runtime == 'containerd' && matrix.kubernetes == 'k3s'
-      - run: patch tests/freeipa-k8s.yaml < tests/freeipa-k8s.yaml.docker.patch
-        if: matrix.runtime == 'docker'
-      - run: patch tests/freeipa-replica-k8s.yaml < tests/freeipa-k8s.yaml.docker.patch
-        if: matrix.runtime == 'docker'
-      - run: patch tests/freeipa-k8s.yaml < tests/freeipa-k8s.yaml.containerd.patch
-        if: matrix.runtime == 'containerd'
-      - run: patch tests/freeipa-replica-k8s.yaml < tests/freeipa-k8s.yaml.containerd.patch
-        if: matrix.runtime == 'containerd'
       - name: Run master and replica in K8s
         run: tests/run-in-k8s.sh localhost/freeipa-server:${{ matrix.os }}
 
@@ -366,25 +392,26 @@ jobs:
           ( echo -n "arches_num=" ; echo "$ARCHES" | jq -r 'length' ) | tee -a $GITHUB_OUTPUT
           ( echo -n "arch0=" ; echo "$ARCHES" | jq -r '.[0]' ) | tee -a $GITHUB_OUTPUT
         id: get-arches
-      - uses: actions/download-artifact@v8
-        with:
-          name: freeipa-server-${{ matrix.os }}-${{ steps.get-arches.outputs.arch0 }}
-        if: steps.get-arches.outputs.arches_num == 1
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: freeipa-server-${{ matrix.os }}-*
-          merge-multiple: true
-        if: steps.get-arches.outputs.arches_num != 1
+      - parallel:
+          - uses: actions/download-artifact@v8
+            with:
+              name: freeipa-server-${{ matrix.os }}-${{ steps.get-arches.outputs.arch0 }}
+            if: steps.get-arches.outputs.arches_num == 1
+          - uses: actions/download-artifact@v8
+            with:
+              pattern: freeipa-server-${{ matrix.os }}-*
+              merge-multiple: true
+            if: steps.get-arches.outputs.arches_num != 1
+          - name: Prepare authentication file
+            run: |
+              cat > auth.json << 'EOF'
+              ${{ secrets.REGISTRY_CREDENTIALS_FILE }}
+              EOF
       - run: |
           echo '${{ steps.get-arches.outputs.arches }}' \
           | jq -r '.[] | "oci-archive:freeipa-server-${{ matrix.os }}-" + . + ".tar.gz"' \
           | xargs podman manifest create freeipa-server:${{ matrix.os }}
         if: steps.get-arches.outputs.arches_num != 1
-      - name: Prepare authentication file
-        run: |
-          cat > auth.json << 'EOF'
-          ${{ secrets.REGISTRY_CREDENTIALS_FILE }}
-          EOF
       - name: Copy ${{ matrix.os }} to registries
         run: |
           set -e
