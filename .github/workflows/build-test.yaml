@@ -233,7 +233,19 @@ jobs:
       - run: $runtime volume create ${{ matrix.volume }}
         if: matrix.volume == 'freeipa-data'
         background: true
-      - run: $runtime build -t localhost/ipa-client -f Dockerfile.test-client .
+      - uses: actions/cache@v6
+        with:
+          path: ipa-client.tar.gz
+          key: v0.1-1-${{ matrix.arch }}
+        id: cache-ipa-client
+      - run: |
+          gunzip < ipa-client.tar.gz | $runtime load
+        if: steps.cache-ipa-client.outputs.cache-hit == 'true'
+        background: true
+      - run: |
+          $runtime build -t localhost/ipa-client -f Dockerfile.test-client .
+          $runtime save localhost/ipa-client | gzip > ipa-client.tar.gz
+        if: steps.cache-ipa-client.outputs.cache-hit != 'true'
         background: true
       - wait:
           - download-image
@@ -297,7 +309,19 @@ jobs:
             && $runtime run --rm -v /tmp/freeipa-data:/data-in:z -v ${{ matrix.volume }}:/data:z --workdir /data docker.io/library/busybox cp -a /data-in/. .
         if: matrix.volume == 'volume'
         background: true
-      - run: $runtime build -t localhost/ipa-client -f Dockerfile.test-client .
+      - uses: actions/cache@v6
+        with:
+          path: ipa-client.tar.gz
+          key: v0.1-1-${{ matrix.arch }}
+        id: cache-ipa-client
+      - run: |
+          gunzip < ipa-client.tar.gz | $runtime load
+        if: steps.cache-ipa-client.outputs.cache-hit == 'true'
+        background: true
+      - run: |
+          $runtime build -t localhost/ipa-client -f Dockerfile.test-client .
+          $runtime save localhost/ipa-client | gzip > ipa-client.tar.gz
+        if: steps.cache-ipa-client.outputs.cache-hit != 'true'
         background: true
       - wait:
           - download-image
