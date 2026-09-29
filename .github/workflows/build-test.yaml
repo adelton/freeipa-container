@@ -207,6 +207,30 @@ jobs:
       - run: jq -n -rf ci/test-matrix-to-html.jq --arg job legend >> $GITHUB_STEP_SUMMARY
         shell: bash
 
+  build-ipa-client:
+    name: Ensure ipa-client image in cache
+    runs-on: ubuntu-26.04${{ (matrix.arch == 'arm64' && '-arm') || (matrix.arch == 'x86_64' && '') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86_64
+          - arm64
+    timeout-minutes: 10
+    steps:
+      - uses: actions/cache@v6
+        with:
+          path: ipa-client.tar.gz
+          key: v0.1-2-${{ matrix.arch }}
+          lookup-only: true
+        id: cache-ipa-client
+      - uses: actions/checkout@v6
+        if: steps.cache-ipa-client.outputs.cache-hit != 'true'
+      - run: |
+          docker build -t localhost/ipa-client -f Dockerfile.test-client .
+          docker save localhost/ipa-client | gzip > ipa-client.tar.gz
+        if: steps.cache-ipa-client.outputs.cache-hit != 'true'
+
   master-and-replica:
     name: Run
     runs-on: ${{ matrix.runs-on }}${{ (matrix.arch == 'arm64' && '-arm') || (matrix.arch == 'x86_64' && '') }}
@@ -237,15 +261,8 @@ jobs:
         with:
           path: ipa-client.tar.gz
           key: v0.1-1-${{ matrix.arch }}
-        id: cache-ipa-client
-      - run: |
-          gunzip < ipa-client.tar.gz | $runtime load
-        if: steps.cache-ipa-client.outputs.cache-hit == 'true'
-        background: true
-      - run: |
-          $runtime build -t localhost/ipa-client -f Dockerfile.test-client .
-          $runtime save localhost/ipa-client | gzip > ipa-client.tar.gz
-        if: steps.cache-ipa-client.outputs.cache-hit != 'true'
+          fail-on-cache-miss: true
+      - run: gunzip < ipa-client.tar.gz | $runtime load
         background: true
       - wait:
           - download-image
@@ -313,15 +330,8 @@ jobs:
         with:
           path: ipa-client.tar.gz
           key: v0.1-1-${{ matrix.arch }}
-        id: cache-ipa-client
-      - run: |
-          gunzip < ipa-client.tar.gz | $runtime load
-        if: steps.cache-ipa-client.outputs.cache-hit == 'true'
-        background: true
-      - run: |
-          $runtime build -t localhost/ipa-client -f Dockerfile.test-client .
-          $runtime save localhost/ipa-client | gzip > ipa-client.tar.gz
-        if: steps.cache-ipa-client.outputs.cache-hit != 'true'
+          fail-on-cache-miss: true
+      - run: gunzip < ipa-client.tar.gz | $runtime load
         background: true
       - wait:
           - download-image
