@@ -241,7 +241,7 @@ if [ "$docker" != "sudo podman" -a "$docker" != "podman" ] ; then
 	DOCKER_RUN_OPTS+=( --link freeipa-master:ipa.example.test )
 fi
 
-if ! $docker images localhost/ipa-client | grep localhost/ipa-client ; then
+if ! $docker images localhost/ipa-client | grep '^localhost/ipa-client' ; then
 	$docker build -t localhost/ipa-client -f Dockerfile.test-client .
 fi
 run_ipa_container localhost/ipa-client ipa-client ''
