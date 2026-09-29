@@ -218,14 +218,13 @@ jobs:
           - arm64
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v6
       - uses: actions/cache@v6
         with:
           path: ipa-client.tar.gz
-          key: v0.1-2-${{ matrix.arch }}
+          key: v0.1-${{ hashFiles('Dockerfile.test-client') }}-${{ matrix.arch }}
           lookup-only: true
         id: cache-ipa-client
-      - uses: actions/checkout@v6
-        if: steps.cache-ipa-client.outputs.cache-hit != 'true'
       - run: |
           docker build -t localhost/ipa-client -f Dockerfile.test-client .
           docker save localhost/ipa-client | gzip > ipa-client.tar.gz
@@ -250,6 +249,13 @@ jobs:
         id: download-image
         background: true
       - uses: actions/checkout@v6
+      - uses: actions/cache@v6
+        with:
+          path: ipa-client.tar.gz
+          key: v0.1-${{ hashFiles('Dockerfile.test-client') }}-${{ matrix.arch }}
+          fail-on-cache-miss: true
+        id: download-ipa-client
+        background: true
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
         if: matrix.runtime == 'docker'
       - uses: ./.github/actions/install-docker-rootless
@@ -257,15 +263,10 @@ jobs:
       - run: $runtime volume create ${{ matrix.volume }}
         if: matrix.volume == 'freeipa-data'
         background: true
-      - uses: actions/cache@v6
-        with:
-          path: ipa-client.tar.gz
-          key: v0.1-1-${{ matrix.arch }}
-          fail-on-cache-miss: true
+      - wait: download-ipa-client
       - run: gunzip < ipa-client.tar.gz | $runtime load
         background: true
-      - wait:
-          - download-image
+      - wait: download-image
       - name: Load image
         run: gunzip < freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz | $runtime load
         background: true
@@ -298,6 +299,13 @@ jobs:
         id: download-image
         background: true
       - uses: actions/checkout@v6
+      - uses: actions/cache@v6
+        with:
+          path: ipa-client.tar.gz
+          key: v0.1-${{ hashFiles('Dockerfile.test-client') }}-${{ matrix.arch }}
+          fail-on-cache-miss: true
+        id: download-ipa-client
+        background: true
       - uses: ./.github/actions/docker-cgroups-ubuntu-22
         if: matrix.runtime == 'docker'
       - uses: ./.github/actions/install-docker-rootless
@@ -316,25 +324,16 @@ jobs:
                  | while read f ; do $runtime run --rm -v /tmp/freeipa-data:/data:z --workdir /data docker.io/library/busybox tar xf image/$f ; done \
             && rm -rf /tmp/freeipa-data/image
         if: matrix.volume == '' || matrix.volume == 'volume'
-        id: populate-volume-directory
-        background: true
-      - wait:
-          - populate-volume-directory
       - name: Populate volume with data
         run: |
           $runtime volume create ${{ matrix.volume }} \
             && $runtime run --rm -v /tmp/freeipa-data:/data-in:z -v ${{ matrix.volume }}:/data:z --workdir /data docker.io/library/busybox cp -a /data-in/. .
         if: matrix.volume == 'volume'
         background: true
-      - uses: actions/cache@v6
-        with:
-          path: ipa-client.tar.gz
-          key: v0.1-1-${{ matrix.arch }}
-          fail-on-cache-miss: true
+      - wait: download-ipa-client
       - run: gunzip < ipa-client.tar.gz | $runtime load
         background: true
-      - wait:
-          - download-image
+      - wait: download-image
       - name: Load image
         run: gunzip < freeipa-server-${{ matrix.os }}-${{matrix.arch}}.tar.gz | $runtime load
         background: true
