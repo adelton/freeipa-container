@@ -4,19 +4,19 @@ run:
     ubuntu-24.04: 1
     ubuntu-26.04: 1
   runtime:
-    podman: 4
+    podman: 1
     sudo podman: 1
-    docker rootless: 3
-    docker: 2
+    docker rootless: 1
+    docker: 1
   readonly:
-    --read-only: 3
-    "": null
+    --read-only: 1
+    "": 1
   ca:
-    "": 3
+    "": 1
     --external-ca: 1
   volume:
     freeipa-data: 1
-    "": null
+    "": 1
   count: 11
   exclude:
 
@@ -25,15 +25,18 @@ test-upgrade:
     ubuntu-24.04: 1
     ubuntu-26.04: 1
   runtime:
-    podman: 2
+    podman: 1
     sudo podman: 1
-    docker rootless: 2
+    docker rootless: 1
     docker: 1
   volume:
     volume-image: 1
     volume: 1
     "": 1
   upgrade-to-from:
+    fedora-rawhide-ipacta:
+      - fedora-44-4.13.1
+      - fedora-43-4.12.5
     fedora-rawhide:
       - fedora-44-4.13.1
       - fedora-43-4.12.5
@@ -94,6 +97,7 @@ k8s:
 push:
   exclude:
     - os: centos-10-stream
+    - os: fedora-rawhide-ipacta
     - os: fedora-44
       arch: arm64
     - os: fedora-43
