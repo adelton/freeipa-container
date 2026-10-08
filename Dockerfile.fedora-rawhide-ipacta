@@ -10,6 +10,7 @@ RUN groupadd -g 285 sssd; useradd -u 285 -g 285 -c 'User for sssd' -r -d /run/ss
 RUN groupadd -g 225 ods; useradd -u 225 -g 225 -c 'opendnssec daemon account' -r -d / -s /sbin/nologin ods
 RUN groupadd -g 207 printadmin
 RUN groupadd -g 325 unbound; useradd -u 325 -g 325 -c 'Unbound DNS resolver' -r -d /var/lib/unbound -s /sbin/nologin unbound
+RUN groupadd -g 317 pkiuser; useradd -u 317 -g 317 -c 'IPA CA User' -r -d / -s /usr/sbin/nologin pkiuser
 
 # Workaround https://bugzilla.redhat.com/show_bug.cgi?id=1615948
 RUN ln -s /bin/false /usr/local/bin/systemd-machine-id-setup
@@ -21,8 +22,11 @@ RUN dnf upgrade -y --setopt=install_weak_deps=False \
 	&& dnf clean all
 RUN rm -f /usr/lib/rpm/macros.d/macros.usr-local-bin
 
-# debug: RUN test $( getent passwd | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|sssd:x:285|named:x:25|ods:x:225|tss:x:59|unbound:x:325):" | wc -l ) -eq 8
-# debug: RUN test $( getent group | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|sssd:x:285|named:x:25|utmp:x:22|wbpriv:x:88|systemd-journal:x:190|ods:x:225|printadmin:x:207|tss:x:59|unbound:x:325):" | wc -l ) -eq 12
+# debug: RUN test $( getent passwd | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|pkiuser:x:317||sssd:x:285|named:x:25|ods:x:225|tss:x:59|unbound:x:325):" | wc -l ) -eq 9
+# debug: RUN test $( getent group | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|pkiuser:x:317||sssd:x:285|named:x:25|utmp:x:22|wbpriv:x:88|systemd-journal:x:190|ods:x:225|printadmin:x:207|tss:x:59|unbound:x:325):" | wc -l ) -eq 13
+
+# https://forge.fedoraproject.org/freeipa/ipacta/pulls/82
+COPY ipacta-pki-tomcatd-container.conf /usr/lib/systemd/system/pki-tomcatd@.service.d/container.conf
 
 # https://forge.fedoraproject.org/freeipa/ipacta/pulls/82
 COPY ipacta-pki-tomcatd-container.conf /usr/lib/systemd/system/pki-tomcatd@.service.d/container.conf
