@@ -15,6 +15,7 @@ RUN groupadd -g 325 unbound; useradd -u 325 -g 325 -c 'Unbound DNS resolver' -r 
 RUN ln -s /bin/false /usr/local/bin/systemd-machine-id-setup
 RUN rpm --eval '%_install_script_path' | sed 's#^#%_install_script_path /usr/local/bin:# ' > /usr/lib/rpm/macros.d/macros.usr-local-bin
 RUN sed -i 's!%_install_langs.*!%_install_langs all!' /etc/rpm/macros.image-language-conf
+RUN dnf -y copr enable twoerner/ipacta-test
 RUN dnf upgrade -y --setopt=install_weak_deps=False \
 	&& dnf install -y --setopt=install_weak_deps=False freeipa-server-dns ipacta freeipa-server-trust-ad freeipa-healthcheck freeipa-client-epn freeipa-server-encrypted-dns patch \
 	&& dnf clean all
@@ -22,6 +23,9 @@ RUN rm -f /usr/lib/rpm/macros.d/macros.usr-local-bin
 
 # debug: RUN test $( getent passwd | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|sssd:x:285|named:x:25|ods:x:225|tss:x:59|unbound:x:325):" | wc -l ) -eq 8
 # debug: RUN test $( getent group | grep -E "^(dirsrv:x:389|ipaapi:x:289|kdcproxy:x:288|sssd:x:285|named:x:25|utmp:x:22|wbpriv:x:88|systemd-journal:x:190|ods:x:225|printadmin:x:207|tss:x:59|unbound:x:325):" | wc -l ) -eq 12
+
+# https://forge.fedoraproject.org/freeipa/ipacta/pulls/82
+COPY ipacta-pki-tomcatd-container.conf /usr/lib/systemd/system/pki-tomcatd@.service.d/container.conf
 
 # Workaround https://bugzilla.redhat.com/show_bug.cgi?id=2412646
 RUN ln -sf /etc/named.ca /var/named/named.ca && chown -h root:named /var/named/named.ca
@@ -73,7 +77,7 @@ RUN systemd-tmpfiles --remove --create
 RUN mv /usr/bin/nisdomainname /usr/bin/nisdomainname.orig
 ADD hostnamectl-wrapper /usr/bin/nisdomainname
 
-## # test: systemd-container-ipa-server-install.sh
+# test: systemd-container-ipa-server-install.sh
 
 # Move configuration and data to data volume
 COPY patches/ipa-data-fedora-45.patch /root

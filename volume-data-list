@@ -57,6 +57,7 @@
 /var/lib/dirsrv/
 /var/lib/ipa/
 /var/lib/ipa-client/
+/var/lib/ipacta/
 /var/lib/pki/
 /var/lib/samba/
 /var/lib/softhsm/tokens/
@@ -75,6 +76,7 @@
 /var/log/ipa/
 /var/log/ipaclient-install.log
 /var/log/ipaclientsamba-install.log
+/var/log/ipacta/
 /var/log/ipa-custodia.audit.log
 /var/log/ipaepn.log
 /var/log/ipa-migrate.log

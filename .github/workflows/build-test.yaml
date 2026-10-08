@@ -47,6 +47,8 @@ jobs:
         arch: [ x86_64, arm64 ]
         docker: [ docker ]
         exclude:
+          - os: fedora-rawhide-ipacta
+            arch: arm64
           - os: fedora-44
             arch: arm64
           - os: fedora-43
@@ -124,6 +126,7 @@ jobs:
           else
             cp build-status/${{ matrix.os }}-${{ matrix.arch }}/build-dist build-status/${{ matrix.os }}-${{ matrix.arch }}/fresh-image
           fi
+          rm -f build-status/${{ matrix.os }}-${{ matrix.arch }}/fresh-image
         shell: bash
       - name: Check resulting annotations
         run: |
