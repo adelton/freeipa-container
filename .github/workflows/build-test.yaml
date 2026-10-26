@@ -72,11 +72,12 @@ jobs:
         run: awk '$1 == "FROM" { print $2 ; exit }' ../minimize-for-build/Dockerfile.${{ matrix.os }} | xargs ${{ matrix.docker }} pull
       - name: Build image
         run: ${{ matrix.docker }} build -t localhost/freeipa-server:${{ matrix.os }} -f Dockerfile.${{ matrix.os }} ../minimize-for-build
-      - uses: anchore/sbom-action@v0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image: localhost/freeipa-server:${{ matrix.os }}
-          output-file: freeipa-server-${{ matrix.os }}-${{matrix.arch}}-sbom.spdx
-          upload-artifact: false
+          image-ref: localhost/freeipa-server:${{ matrix.os }}
+          scan-type: image
+          format: spdx-json
+          output: freeipa-server-${{ matrix.os }}-${{matrix.arch}}-sbom.spdx
       - run: cat *-sbom.spdx
 
       - name: Create directory for artifacts
