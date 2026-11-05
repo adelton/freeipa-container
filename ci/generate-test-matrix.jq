@@ -149,9 +149,10 @@ end
 		| random_repeat($e; $remove | length)
 	)
 	| random_select($count; $ensure)
-		| if ( .dist as $d | $fresh | any(. == $d) ) then .["fresh-image"] = true end
-		| if ( .dist as $d | any($d | xcontains($nopush[])) ) then .["nopush"] = true end
-		| del(.dist)
+	| .dist as $d
+	| if ( $fresh | any(xcontains($d)) ) then .["fresh-image"] = true end
+	| if ( $nopush | any(xcontains($d)) ) then .["nopush"] = true end
+	| del(.dist)
 ]
 | sort_by(.os, .arch, .["runs-on"], .kubernetes, .runtime, .readonly, .ca, .volume, .["data-from"])
 
