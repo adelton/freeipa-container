@@ -16,38 +16,40 @@ def xcontains($element):
 	$element | to_entries | map($input[.key] == .value) | all
 ;
 
-def random_select($count; $ensure):
-	if $count <= 0 or length <= 0 then empty
-	else
-		. as $in
-		|
-		[ foreach ($ensure | keys[]) as $k ({};
-			( $ensure[$k] | .[ now * 1000000 % length ] ) as $kk
-			| .[$k] = $kk;
-			.
-			),
-			[]
-		]
-		| (if length > 1 then .[0] else {} end) as $always_remove
-		| reverse
-		| until((. | length < 2) or (.[0] | length > 0);
-			[ . as $dot
-			| [ $in[] | select(xcontains($dot[1])) ]
-			,
-			$dot[2:][]])
-		| if .[0] | length > 0 then .[0] else $in end
-		| .[ now * 1000000 % length ]
-		| . as $row
-		| $row,
-			($in - [ $row ]
-				| random_select($count - 1;
-					($row + $always_remove)
-						| to_entries
-						| reduce .[] as $e ($ensure;
-							if .[$e.key] then .[$e.key] -= [ $e.value ] end)
-								| del(..|select(. == []))))
-
+# all $k-nuples for an array
+def array_subsets($k):
+	if $k == 0 then []
+	elif length == 0 then empty
+	else (.[0] as $h | (.[1:] | array_subsets($k - 1)) as $r | [$h] + $r),
+		(.[1:] | array_subsets($k))
 	end
+;
+
+# all $k-nuples for the record
+def object_subsets($k):
+	[ to_entries | array_subsets($k) | from_entries ]
+;
+
+def random_select($count; $k):
+	( [ .out[] | object_subsets($k) ] | add // [] | unique ) as $already_covered
+	| .in |= map(.k_subsets = (.data | object_subsets($k)) - $already_covered)
+	| .aggregate = ([ .in[].k_subsets ] | add // [] | unique)
+
+	| until( (.out | length) >= $count or (.aggregate | length) == 0 or (.in | length) == 0;
+		[ .in[].k_subsets | length ] as $subsets_counts
+		| ($subsets_counts | max) as $max
+		| ( [ range(0; $subsets_counts | length) | select($subsets_counts[.] == $max) ]
+			| .[now * 1000000 % length] ) as $i
+		| .in[$i] as $selected
+		| .out += [ $selected.data ]
+		| .in -= [ $selected ]
+		| .in |= map(.k_subsets -= $selected.k_subsets)
+		| .aggregate -= $selected.k_subsets
+		)
+	| if $k < (.in[0].data | length) and (.out | length) < $count
+		then random_select($count; $k + 1)
+		else .
+		end
 ;
 
 def xcontains_any($element):
@@ -81,8 +83,6 @@ else
 then
 	.run as { "runs-on": $runson, $runtime, $readonly, $ca, $volume, $exclude }
 	| [
-		.run | to_entries | reduce .[] as $e ({}; .[$e.key] |= [ $e.value | objects | . as $o | keys[] | select($o[.] != null)])
-		| .dist |= $fresh_or_dist,
 		[ {
 		"os": null, "arch": null,
 		"dist": ($fresh | repeat_array(3), $dist)[],
@@ -100,12 +100,6 @@ elif $ARGS.named["job"] == "test-upgrade"
 then
 	.["test-upgrade"] as { "runs-on": $runson, $runtime, $volume, "upgrade-to-from": $upgrade, $exclude }
 	| [
-		.["test-upgrade"] | to_entries | reduce .[] as $e ({};
-			if $e.key == "upgrade-to-from"
-			then .["data-from"] |= ([ $e.value[$fresh_or_dist[].os] | arrays[]] | unique)
-			else .[$e.key] |= [ $e.value | objects | . as $o | keys[] | select($o[.] != null)]
-			end)
-		| .dist |= [($fresh_or_dist[] | select($upgrade[.os]))],
 		[ {
 		"os": null, "arch": null,
 		"dist": (($fresh | repeat_array(3), $dist) | .[] | select($upgrade[.os])),
@@ -122,8 +116,6 @@ elif $ARGS.named["job"] == "k8s"
 then
 	.k8s as { "runs-on": $runson, $kubernetes, $runtime, $exclude }
 	| [
-		.k8s | to_entries | reduce .[] as $e ({}; .[$e.key] |= [ $e.value | objects | . as $o | keys[] | select($o[.] != null)])
-		| .dist |= $fresh_or_dist,
 		[ {
 		"os": null, "arch": null,
 		"dist": ($fresh | repeat_array(3), $dist)[],
@@ -139,16 +131,15 @@ else
 	error("Unknown job")
 end
 
-| ( .[0] | del(..|select(. == [])) ) as $ensure
-| ( .[2] // [] ) as $exclude
-
-| [
-	reduce $exclude[] as $e (.[1];
-		map(select(xcontains($e))) as $remove
-		| map(select(xcontains($e) | not))
-		| random_repeat($e; $remove | length)
+| ( .[1] // [] ) as $exclude
+| reduce $exclude[] as $e (.[0];
+	map(select(xcontains($e))) as $remove
+	| map(select(xcontains($e) | not))
+	| random_repeat($e; $remove | length)
 	)
-	| random_select($count; $ensure)
+| { in: map({data: .}), out: [] }
+| random_select($count; 1)
+| [ .out[]
 	| .dist as $d
 	| if ( $fresh | any(xcontains($d)) ) then .["fresh-image"] = true end
 	| if ( $nopush | any(xcontains($d)) ) then .["nopush"] = true end
