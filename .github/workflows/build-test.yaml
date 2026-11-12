@@ -212,6 +212,7 @@ jobs:
           jq -f ci/generate-test-matrix.jq -c --arg job push-data .github/build-test-data.json \
               | tee /dev/stderr \
               | jq -cj '"matrix-push-data=", ., "\n"' >> $GITHUB_OUTPUT
+        shell: bash -eux {0}
       - run: jq -n -rf ci/test-matrix-to-html.jq --arg job legend >> $GITHUB_STEP_SUMMARY
 
   build-ipa-client:
