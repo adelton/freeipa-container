@@ -464,8 +464,11 @@ jobs:
     environment:
       name: registry-prod
       deployment: false
+    permissions:
+      contents: read
+      deployments: write
     needs: [ master-and-replica, test-upgrade, test-k8s, test-plan ]
-    if: needs.test-plan.outputs.matrix-push != '[]' && github.event_name != 'pull_request' && github.repository == 'adelton/freeipa-container' && github.ref == 'refs/heads/environments'
+    if: needs.test-plan.outputs.matrix-push != '[]' && github.event_name != 'pull_request' && github.repository == 'adelton/freeipa-container' && github.ref == 'refs/heads/env-deployments'
     strategy:
       fail-fast: false
       matrix:
@@ -499,6 +502,11 @@ jobs:
           jq -nr '$ENV.ARCHES | fromjson[] | "oci-archive:freeipa-server-" + $ENV.OS + "-" + . + ".tar.gz"' \
           | xargs podman manifest create "freeipa-server:$OS"
         if: env.ARCHES_NUM != 1
+      - id: get-freeipa-version
+        run: |
+          VERSION=$( skopeo inspect --format='{{index .Labels "org.opencontainers.image.version"}}' oci-archive:freeipa-server-$OS-$ARCH0.tar.gz | sed 's/-.*//' )
+          test -n "$VERSION"
+          echo "version=$VERSION" | tee -a $GITHUB_OUTPUT
       - name: Copy ${{ matrix.os }} to registries
         run: |
           set -e
@@ -510,13 +518,53 @@ jobs:
             else
               podman manifest push --authfile=auth.json "freeipa-server:$OS" "$r:$OS"
             fi
-            VERSION=$( skopeo inspect --format='{{index .Labels "org.opencontainers.image.version"}}' $f | sed 's/-.*//' )
-            test -n "$VERSION"
-            skopeo copy --authfile=auth.json --all "$r:$OS" "$r:$OS-$VERSION"
-            echo "Tagged as $OS-$VERSION as well"
+            skopeo copy --authfile=auth.json --all "$r:$OS" "$r:$OS-$FREEIPA_VERSION"
+            echo "Tagged as $OS-$FREEIPA_VERSION as well"
           done << EOF
           $REGISTRY_TARGET_LIST
           EOF
+          echo "Pushed freeipa-server:$OS-$FREEIPA_VERSION" >> $GITHUB_STEP_SUMMARY
         env:
           REGISTRY_TARGET_LIST: ${{ vars.REGISTRY_TARGET_LIST }}
+          FREEIPA_VERSION: ${{ steps.get-freeipa-version.outputs.version }}
+      - name: Record deployment
+        run: |
+          deployment_id=$(
+            jq -n -f /dev/stdin <<'EOS' \
+            | tee /dev/stderr \
+            | curl -sSL -X POST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H 'Content-Type: application/json' \
+              -d '@-' \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/deployments" \
+            | tee /dev/stderr \
+            | jq '.id'
+          {
+            ref: $ENV.GITHUB_REF_NAME,
+            environment: ( "registry-push: " + $ENV.OS ),
+            description: ( "Push of " + $ENV.OS + ", also tagged as " + $ENV.OS + "-" + $ENV.FREEIPA_VERSION ),
+            auto_merge: false,
+            required_contexts: [],
+            transient_environment: true
+          }
+          EOS
+          )
+          jq -n -f /dev/stdin <<'EOS' \
+            | tee /dev/stderr \
+            | curl -sSL -X POST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H 'Content-Type: application/json' \
+              -d '@-' \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/deployments/$deployment_id/statuses" \
+            | tee /dev/stderr
+          {
+            state: "success",
+            description: ( "Push of " + $ENV.OS + ", also tagged as " + $ENV.OS + "-" + $ENV.FREEIPA_VERSION ),
+            environment_url: ( "https://quay.io/repository/freeipa/freeipa-server?tab=tags&filter_tag_name=like:" + $ENV.OS ),
+            log_url: ( $ENV.GITHUB_SERVER_URL + "/" + $ENV.GITHUB_REPOSITORY + "/actions/runs/" + $ENV.GITHUB_RUN_ID )
+          }
+          EOS
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FREEIPA_VERSION: ${{ steps.get-freeipa-version.outputs.version }}
 
