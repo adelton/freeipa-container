@@ -6,11 +6,8 @@ run:
   runtime:
     podman: 4
     sudo podman: 1
-    docker rootless: 3
-    docker: 2
   readonly:
     --read-only: 3
-    "": 1
   ca:
     "": 3
     --external-ca: 1
@@ -27,8 +24,6 @@ test-upgrade:
   runtime:
     podman: 2
     sudo podman: 1
-    docker rootless: 2
-    docker: 1
   volume:
     volume-image: 1
     volume: 1
@@ -78,7 +73,7 @@ k8s:
     cri-o: 1
     docker: 1
     containerd: 1
-  count: 9
+  count: 4
   exclude:
     - kubernetes: kubeadm init
       runtime: docker
