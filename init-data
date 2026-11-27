@@ -30,6 +30,9 @@ if [ "$#" -ge 1 ] ; then
 	fi
 fi
 
+exec 2>&1
+mount
+find /run /tmp
 for i in /run/* /tmp/var/tmp/* /tmp/* ; do
 	if [ "$i" == '/run/secrets' ] ; then
 		:
@@ -43,6 +46,7 @@ for i in /run/* /tmp/var/tmp/* /tmp/* ; do
 		done
 	fi
 done
+find /run /tmp
 
 /usr/local/bin/populate-volume-from-template /tmp
 

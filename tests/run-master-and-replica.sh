@@ -105,6 +105,7 @@ function run_ipa_container() {
 		fi
 		OPTS+=( --sysctl net.ipv6.conf.all.disable_ipv6=0 )
 	fi
+	OPTS+=( -e DEBUG_TRACE=1 )
 	if [ -n "$seccomp" ] ; then
 		OPTS+=( --security-opt "seccomp=$seccomp" )
 	fi
