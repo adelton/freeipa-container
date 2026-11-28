@@ -39,6 +39,8 @@ while IFS= read -r p ; do
 done < <( findmnt -lno TARGET | sed -n '/^\/run\/\|^\/tmp\//{ s/[[*?\\]/\\&/g; p }' )
 find /run /tmp -mount -xdev -mindepth 1 "${mountpoints[@]}" \( -type f -o -type l -o -empty \) -delete
 find /run /tmp
+systemd-tmpfiles --remove --create --prefix=/run --prefix=/tmp || systemd-tmpfiles --create --prefix=/run --prefix=/tmp
+find /run /tmp
 
 /usr/local/bin/populate-volume-from-template /tmp
 
