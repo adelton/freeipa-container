@@ -4,10 +4,8 @@ run:
     ubuntu-24.04: 1
     ubuntu-26.04: 1
   runtime:
-    podman: 4
-    sudo podman: 1
-    docker rootless: 3
-    docker: 2
+    docker rootless: 1
+    docker: 1
   readonly:
     --read-only: 3
     "": 1
@@ -17,7 +15,7 @@ run:
   volume:
     freeipa-data: 1
     "": 1
-  count: 11
+  count: 4
   exclude:
 
 test-upgrade:
@@ -25,9 +23,7 @@ test-upgrade:
     ubuntu-24.04: 1
     ubuntu-26.04: 1
   runtime:
-    podman: 2
-    sudo podman: 1
-    docker rootless: 2
+    docker rootless: 1
     docker: 1
   volume:
     volume-image: 1
@@ -75,10 +71,8 @@ k8s:
     rke2: 1
     k0s: 1
   runtime:
-    cri-o: 1
     docker: 1
-    containerd: 1
-  count: 9
+  count: 3
   exclude:
     - kubernetes: kubeadm init
       runtime: docker
