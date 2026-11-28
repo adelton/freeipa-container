@@ -4,8 +4,6 @@ run:
     ubuntu-24.04: 1
     ubuntu-26.04: 1
   runtime:
-    podman: 4
-    sudo podman: 1
     docker rootless: 3
     docker: 2
   readonly:
@@ -25,8 +23,6 @@ test-upgrade:
     ubuntu-24.04: 1
     ubuntu-26.04: 1
   runtime:
-    podman: 2
-    sudo podman: 1
     docker rootless: 2
     docker: 1
   volume:
@@ -75,9 +71,7 @@ k8s:
     rke2: 1
     k0s: 1
   runtime:
-    cri-o: 1
     docker: 1
-    containerd: 1
   count: 9
   exclude:
     - kubernetes: kubeadm init
