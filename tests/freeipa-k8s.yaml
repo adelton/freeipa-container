@@ -78,6 +78,7 @@ spec:
   - name: freeipa-server
     image: localhost/freeipa-server:latest
     imagePullPolicy: Never
+    tty: true
     securityContext:
       readOnlyRootFilesystem: true
     volumeMounts:
@@ -104,6 +105,8 @@ spec:
       value: "-U -r CLUSTER.LOCAL --setup-dns --no-forwarders --no-ntp --ip-address=10.43.201.201"
     - name: IPA_SERVER_IP
       value: no-update
+    - name: SYSTEMD_OPTS
+      value: --show-status=true
     readinessProbe:
       exec:
         command: [ "/usr/bin/systemctl", "status", "ipa" ]
