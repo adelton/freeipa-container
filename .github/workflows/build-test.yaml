@@ -2,7 +2,6 @@ name: Build and test FreeIPA containers
 run-name: Build and test FreeIPA containers${{ github.event_name == 'workflow_dispatch' && format(' ({0})', inputs.os) || ''}}
 
 on:
-  push:
   pull_request:
   workflow_dispatch:
     inputs:
